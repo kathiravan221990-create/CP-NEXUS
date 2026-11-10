@@ -366,7 +366,8 @@
   #plinksModal .ipsec-card-head{ position:sticky; top:0; z-index:2; padding:6px 0 10px; margin-bottom:4px;
     background:linear-gradient(180deg,#14304a 70%,rgba(20,48,74,0)); }
   #plinksModal .ipsec-card-head h3{ font-size:22px; }
-  #plinksModal .ipsec-x{ font-size:30px; }
+  .plinks-back{ background:transparent; border:1px solid rgba(201,210,218,.3); color:#eef3f8; border-radius:10px; padding:9px 16px; cursor:pointer; font-size:14px; font-family:inherit; }
+  .plinks-back:hover{ border-color:#e0bc63; color:#e0bc63; }
   #plinksList{ display:grid !important; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:14px; align-items:start; }
   #plinksList > .plink-h, #plinksList > .plink-hint, #plinksList > .plink-who, #plinksList > p, #plinksList > .ipsec-empty{ grid-column:1 / -1; margin:6px 0 0; }
   #plinksList > .plink-h{ margin-top:20px; padding-bottom:6px; border-bottom:1px solid rgba(216,166,55,.35); font-size:14px; }
@@ -542,9 +543,9 @@
   <div class="ipsec-card" style="max-width:640px;">
     <div class="ipsec-card-head">
       <h3>PORTAL LINKS</h3>
-      <button class="ipsec-x" id="plinksClose">&times;</button>
+      <button class="plinks-back" id="plinksClose" type="button">← Back to Home</button>
     </div>
-    <div class="ipsec-sub">Each portal loads live from its link, so a new deploy shows up automatically. Sign in with your HR / Management account to change a link or upload a new version of an app. Changes apply for everyone, on every device, the next time a tile is opened.</div>
+    <div class="ipsec-sub">Each portal loads live from its link, so a new deploy shows up automatically. Only the Administrator can change a link or upload a new version of an app. Changes apply for everyone, on every device, the next time a tile is opened.</div>
     <div id="plinksList" class="ipsec-list" style="margin-top:16px;"></div>
   </div>
 </div>
