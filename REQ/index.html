@@ -2659,7 +2659,7 @@ const REMOTE=!!(SUPABASE_URL&&SUPABASE_KEY);
 const NEXUS_URL='https://iubckxdeiasflbwaoutd.supabase.co';
 const NEXUS_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml1YmNreGRlaWFzZmxid2FvdXRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY1MTYyMzEsImV4cCI6MjEwMjA5MjIzMX0.s1PYd8OzHTLDks7Ao4a1OYIpifrXKtkE1BguwBfx_GM';
 /* Nexus role id -> this app's department. A role not listed here cannot use the Requisition Portal. */
-const ROLE_MAP={production:'Production',maintenance:'Maintenance',engineering:'Engineering',scm:'SCM',hr_admin:'HR',manager:'Manager',ceo:'CEO'};
+const ROLE_MAP={administrator:'Manager',production:'Production',maintenance:'Maintenance',engineering:'Engineering',scm:'SCM',hr_admin:'HR',manager:'Manager',ceo:'CEO'};
 const IN_NEXUS=(function(){try{return window.parent!==window}catch(e){return true}})();
 let NEXUS_USER=null;
 const $=s=>document.querySelector(s);

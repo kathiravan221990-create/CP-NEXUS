@@ -386,7 +386,7 @@ const SUPABASE_URL='https://iubckxdeiasflbwaoutd.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml1YmNreGRlaWFzZmxid2FvdXRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY1MTYyMzEsImV4cCI6MjEwMjA5MjIzMX0.s1PYd8OzHTLDks7Ao4a1OYIpifrXKtkE1BguwBfx_GM';
 let NEXUS_TOKEN='',NEXUS_USER=null;
 const IN_NEXUS=(()=>{try{return window.parent!==window}catch(e){return true}})();
-const ROLE_OK=['production','maintenance','engineering','manager','ceo'];
+const ROLE_OK=['production','maintenance','engineering','manager','ceo','administrator'];
 const CLOUD=!!(SUPABASE_URL&&SUPABASE_KEY);
 const COMPANIES=[
   {code:'CPK', name:'Classic Pack'},
@@ -1598,7 +1598,7 @@ function boot0(){
   showNexusMsg('Please open the Engineering Work Card from CP NEXUS.');
 }
 /* ---- CP NEXUS sign-in: the person arrives already logged in (no second password) ---- */
-const NEXUS_TEAM={production:'production',maintenance:'maintenance',engineering:'engineering',manager:'manager',ceo:'ceo'};
+const NEXUS_TEAM={administrator:'manager',production:'production',maintenance:'maintenance',engineering:'engineering',manager:'manager',ceo:'ceo'};
 function showNexusMsg(m,btn){
   const c=$('cloudmsg');if(c)c.remove();$('landing').hidden=true;$('app').hidden=true;$('login').hidden=false;
   const card=document.querySelector('#login .login-card');
