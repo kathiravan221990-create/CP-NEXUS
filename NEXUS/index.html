@@ -1006,7 +1006,7 @@ function decodeEmbeddedHtml(b64){
   });
   function userToCurrent(u){
     const base = NEXUS_CONFIG.departments.find(function(d){ return d.id === u.role_id; }) || { id: u.role_id, portals: [] };
-    const d = Object.assign({}, base, { id: u.role_id, name: u.role_name || base.name || u.role_id, isAdmin: !!u.is_admin });
+    const d = Object.assign({}, base, { id: u.role_id, name: u.role_name || base.name || u.role_id, isAdmin: !!u.is_admin, isSuper: !!u.is_super });
     delete d.password;
     return { name: u.display_name || u.username, username: u.username, dept: d, mustChange: !!u.must_change_password };
   }
@@ -1479,7 +1479,7 @@ function decodeEmbeddedHtml(b64){
       cpw.parentNode.insertBefore(ub, cpw);
       ub.addEventListener('click', openUsersPanel);
     }
-    ub.style.display = (currentUser && currentUser.username && currentUser.dept && currentUser.dept.isAdmin) ? '' : 'none';
+    ub.style.display = (currentUser && currentUser.username && currentUser.dept && currentUser.dept.isSuper) ? '' : 'none';
     if(isManager && currentIp) checkManagerDefaultMismatch(currentIp);
 
     IP_SECURITY.startPeriodicRecheck(function(){
@@ -1519,6 +1519,7 @@ function decodeEmbeddedHtml(b64){
   function isMgr(dept){ return !!dept && (dept.id === 'manager' || dept.isAdmin === true); }
   function portalVisibleTo(p, dept){
     if(!dept || p._active === false) return false;
+    if(p.id === 'portal_links') return dept.isSuper === true; /* Administrator only */
     if(isMgr(dept)) return true;
     if(p._depts) return p._depts.indexOf(dept.id) !== -1;
     const allowed = dept.portals || ["*"];
@@ -1735,12 +1736,10 @@ function decodeEmbeddedHtml(b64){
 
   if(btnIpSec) btnIpSec.addEventListener('click', openIpSecPanel);
 
-  // ---------- PORTAL LINKS panel (HR + Management; real Supabase sign-in) ----------
+  // ---------- PORTAL LINKS panel (Administrator only; uses the Nexus login) ----------
   // Same accounts as CP Portal Live (Supabase Auth + profiles.role). A separate
   // client is used for sign-in so the IP-Security checks keep using the anon key.
   const plinksModal = document.getElementById('plinksModal');
-  const HR_MGMT_ROLES = ['hr', 'management', 'manager'];
-  let authClient = null;
   let tokClient = null;
   function getAuthClient(){
     const tok = getToken();
@@ -1748,22 +1747,7 @@ function decodeEmbeddedHtml(b64){
       if(!tokClient || tokClient._t !== tok){ tokClient = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { 'x-nexus-token': tok } } }); tokClient._t = tok; }
       return tokClient;
     }
-    if(authClient) return authClient;
-    if(!window.supabase) return null;
-    authClient = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'nexus-hr-auth' } });
-    return authClient;
-  }
-  async function getAuthorisedUser(){
-    const ac = getAuthClient();
-    if(!ac) return null;
-    try {
-      const { data } = await ac.auth.getSession();
-      const session = data && data.session;
-      if(!session) return null;
-      const { data: prof, error } = await ac.from('profiles').select('role, full_name').eq('id', session.user.id).single();
-      if(error || !prof || HR_MGMT_ROLES.indexOf(String(prof.role || '').toLowerCase()) === -1) return null;
-      return { email: session.user.email, name: prof.full_name || session.user.email, role: prof.role };
-    } catch(e){ return null; }
+    return null; /* no Nexus session = no access (the old HR / Manager email sign-in is removed) */
   }
   function el(tag, cls, text){
     const n = document.createElement(tag);
@@ -1780,61 +1764,9 @@ function decodeEmbeddedHtml(b64){
     const list = document.getElementById('plinksList');
     list.innerHTML = '<p class="ipsec-empty">Loading…</p>';
     plinksModal.classList.add('show');
-    const user = await getAuthorisedUser();
-    if(!user){ renderPlinksSignIn(list, ''); return; }
-    await renderPlinksAdmin(list, user);
-  }
-
-  function renderPlinksSignIn(list, note){
-    list.innerHTML = '';
-    const box = el('div', 'plink-row');
-    box.appendChild(el('b', '', 'Sign in to change links or upload apps'));
-    box.appendChild(el('div', 'plink-hint', 'Use your CP Portal Live HR or Management email and password.'));
-    const email = el('input'); email.type = 'email'; email.placeholder = 'Email'; email.autocomplete = 'username';
-    const pw = el('input'); pw.type = 'password'; pw.placeholder = 'Password'; pw.autocomplete = 'current-password';
-    const msg = el('span', 'plink-msg err', note || '');
-    const go = el('button', 'btn-primary', 'Sign in'); go.type = 'button';
-    async function doSignIn(){
-      const ac = getAuthClient();
-      if(!ac){ msg.className = 'plink-msg err'; msg.textContent = 'Sign-in service not loaded. Check the internet connection.'; return; }
-      if(!email.value.trim() || !pw.value){ msg.className = 'plink-msg err'; msg.textContent = 'Enter email and password'; return; }
-      go.disabled = true; msg.className = 'plink-msg'; msg.textContent = 'Signing in…';
-      const { error } = await ac.auth.signInWithPassword({ email: email.value.trim(), password: pw.value });
-      if(error){ go.disabled = false; msg.className = 'plink-msg err'; msg.textContent = error.message; return; }
-      const user = await getAuthorisedUser();
-      if(!user){
-        await ac.auth.signOut();
-        go.disabled = false; msg.className = 'plink-msg err';
-        msg.textContent = 'This account is not set as HR or Management in CP Portal Live.';
-        return;
-      }
-      pw.value = '';
-      openPortalLinksPanel();
-    }
-    go.addEventListener('click', doSignIn);
-    pw.addEventListener('keydown', function(e){ if(e.key === 'Enter') doSignIn(); });
-    // Forgot password: a request email addressed to the administrator (NEXUS_CONFIG.passwordResetEmail)
-    const forgot = el('a', 'ipsec-link-btn', 'Forgot password? Email a reset request');
-    function updateForgotHref(){
-      const acct = email.value.trim();
-      const subject = 'CP NEXUS password reset request' + (acct ? ' - ' + acct : '');
-      const body = 'Please reset the password for this CP NEXUS / CP Portal Live account:\n\n' + (acct || '(type the account email here)') + '\n\nRequested on ' + new Date().toLocaleString('en-IN') + '.';
-      forgot.href = 'mailto:' + NEXUS_CONFIG.passwordResetEmail + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
-    }
-    updateForgotHref();
-    email.addEventListener('input', updateForgotHref);
-    forgot.addEventListener('click', function(e){
-      if(!email.value.trim()){
-        e.preventDefault();
-        msg.className = 'plink-msg err'; msg.textContent = 'Type your account email first, then press Forgot password';
-        return;
-      }
-      updateForgotHref();
-      msg.className = 'plink-msg'; msg.textContent = 'Opening your email app. Send the request to ' + NEXUS_CONFIG.passwordResetEmail;
-    });
-    const actions = el('div', 'plink-actions'); actions.appendChild(go); actions.appendChild(forgot); actions.appendChild(msg);
-    box.appendChild(email); box.appendChild(addEyeToggle(pw)); box.appendChild(actions);
-    list.appendChild(box);
+    const cu = currentUser && currentUser.dept && currentUser.dept.isSuper ? currentUser : null;
+    if(!cu || !getToken()){ list.innerHTML = ''; list.appendChild(el('p', 'ipsec-empty', 'Portal Links can be changed by the Administrator only.')); return; }
+    await renderPlinksAdmin(list, { email: cu.username, name: cu.name || cu.username, role: (cu.dept && cu.dept.name) || 'Administrator' });
   }
 
   async function renderPlinksAdmin(list, user){
@@ -1843,9 +1775,6 @@ function decodeEmbeddedHtml(b64){
     // who is signed in
     const who = el('div', 'plink-who');
     who.appendChild(el('span', '', 'Signed in as ' + user.name + ' (' + user.role + ')'));
-    const out = el('button', 'ipsec-link-btn', 'Sign out'); out.type = 'button';
-    out.addEventListener('click', async function(){ await ac.auth.signOut(); openPortalLinksPanel(); });
-    who.appendChild(out);
     list.appendChild(who);
 
     // ---- change password (this account's CP Portal Live / NEXUS password) ----
