@@ -1622,7 +1622,10 @@ function decodeEmbeddedHtml(b64){
       const uploaded = liveUrl ? null : await loadUploadedHtml(portal.id); // newest uploaded copy, if any
       if(liveUrl){
         frame.removeAttribute('srcdoc');
-        frame.src = liveUrl;
+        /* ask the browser for the newest copy of the app (changes every 5 minutes), so an update shows without clearing the cache */
+        let freshUrl = liveUrl;
+        try { const u = new URL(liveUrl, location.href); u.searchParams.set('v', String(Math.floor(Date.now() / 300000))); freshUrl = u.toString(); } catch(e){}
+        frame.src = freshUrl;
       } else if(uploaded){
         frame.srcdoc = uploaded;
       } else if(b64){
