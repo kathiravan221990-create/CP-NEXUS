@@ -111,6 +111,13 @@ input:focus, select:focus, textarea:focus{outline:2px solid var(--brass);outline
 .accordion-title{font-family:'Fraunces',serif;font-size:15px;font-weight:600;margin:0;}
 .accordion-count{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--slate-light);}
 .accordion-body{border-top:1px solid var(--line);}
+.bill-filter-bar{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--line);background:#faf8f2;}
+.bill-filter-bar .field-label{margin:0 0 4px;}
+.bill-filter-bar select{width:170px;}
+.bf-clear{margin-bottom:8px;cursor:pointer;}
+.bf-summary{margin-left:auto;font-size:12px;padding-bottom:6px;}
+.bf-ok{color:#2e7d32;}.bf-bad{color:#c0392b;}
+.bf-missing{background:#fff4f2;}
 .accordion-section.collapsed .accordion-body{display:none;}
 .accordion-actions{display:flex;gap:10px;align-items:center;}
 
@@ -1324,11 +1331,10 @@ function arrearBlockHtml(type, r, deviationAbs){
   return `<div class="arrear-block">${actionsHtml}${statusHtml}</div>`;
 }
 
-function renderRecordTable(type){
+function renderRecordTableCore(type, list){
   const cfg = COMPLIANCE_TYPES[type];
   const body = document.getElementById(type + '-body');
   if(!body) return;
-  const list = recordIndexes[type];
   const colCount = cfg.stages === 3 ? 12 : (cfg.stages === 1 ? 5 : 8);
   document.getElementById('count-' + type).textContent = list.length + (list.length === 1 ? ' record' : ' records');
   if(list.length === 0){
@@ -1386,6 +1392,72 @@ function renderRecordTable(type){
       <td>${currentRole === 'hr' ? deleteIconHtml(type, r.id) : ''}</td>
     </tr>`;
   }).join('');
+}
+
+/* ---------- MONTH + STATUS FILTER for Labour / PF / ESI / CGST-SGST ---------- */
+const billFilter = { labour:{month:null,status:'all'}, pf:{month:null,status:'all'}, esi:{month:null,status:'all'}, cgst:{month:null,status:'all'} };
+const MONTH_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+function monthFullLabel(m){ const p = String(m||'').slice(0,7).split('-'); const i = parseInt(p[1],10) - 1; return (p.length === 2 && i >= 0 && i < 12) ? MONTH_FULL[i] + ' ' + p[0] : String(m||''); }
+function monthIdx(m){ const p = String(m||'').slice(0,7).split('-'); return parseInt(p[0],10) * 12 + parseInt(p[1],10); }
+function billMonths(type){
+  const set = new Set();
+  (recordIndexes[type] || []).forEach(r => { if(r.month) set.add(String(r.month).slice(0,7)); });
+  return Array.from(set).sort().reverse();
+}
+/* contractors who filed this bill type in the 2 months before `month` but have nothing in `month` */
+function missingContractors(type, month){
+  const recs = recordIndexes[type] || [];
+  const have = new Set(recs.filter(r => String(r.month||'').slice(0,7) === month).map(r => r.contractor_id));
+  const mi = monthIdx(month);
+  const recent = new Set(recs.filter(r => { const d = mi - monthIdx(r.month); return d >= 1 && d <= 2; }).map(r => r.contractor_id));
+  return (contractors || []).filter(c => recent.has(c.id) && !have.has(c.id)).sort((a,b) => String(a.name).localeCompare(String(b.name)));
+}
+function billFilterBar(type){
+  let bar = document.getElementById('bf-' + type);
+  if(!bar){
+    const body = document.querySelector('#section-' + type + ' .accordion-body');
+    if(!body) return null;
+    bar = document.createElement('div'); bar.className = 'bill-filter-bar'; bar.id = 'bf-' + type;
+    bar.addEventListener('click', e => e.stopPropagation());
+    body.insertBefore(bar, body.firstChild);
+  }
+  return bar;
+}
+function setBillFilter(type, key, value){ billFilter[type][key] = value; renderRecordTable(type); }
+function renderRecordTable(type){
+  const all = recordIndexes[type] || [];
+  const bf = billFilter[type];
+  const months = billMonths(type);
+  if(bf.month === null || (bf.month !== '' && months.indexOf(bf.month) === -1)) bf.month = months[0] || '';
+  let list = all;
+  if(bf.month) list = list.filter(r => String(r.month||'').slice(0,7) === bf.month);
+  if(bf.status === 'pending') list = list.filter(r => r.status !== 'done');
+  else if(bf.status === 'done') list = list.filter(r => r.status === 'done');
+  const missing = (bf.month && bf.status !== 'done') ? missingContractors(type, bf.month) : [];
+  renderRecordTableCore(type, list);
+  const body = document.getElementById(type + '-body');
+  if(body && missing.length){
+    const cfg = COMPLIANCE_TYPES[type];
+    const colCount = cfg.stages === 3 ? 12 : (cfg.stages === 1 ? 5 : 8);
+    const empty = body.querySelector('.empty-row'); if(empty) empty.remove();
+    body.insertAdjacentHTML('beforeend', missing.map(c => `<tr class="bf-missing"><td>${escapeHtml(c.name)}</td><td class="mono"><span class="month-main">${escapeHtml(formatMonthLabel(bf.month))}</span></td><td colspan="${colCount - 2}"><span class="stamp pending">Not uploaded yet</span></td></tr>`).join(''));
+  }
+  /* the bar */
+  const bar = billFilterBar(type);
+  if(bar){
+    const doneN = (bf.month ? all.filter(r => String(r.month||'').slice(0,7) === bf.month) : all).filter(r => r.status === 'done').length;
+    const inMonth = bf.month ? all.filter(r => String(r.month||'').slice(0,7) === bf.month).length : all.length;
+    const pendN = inMonth - doneN;
+    const opts = months.map(m => `<option value="${m}"${bf.month === m ? ' selected' : ''}>${escapeHtml(monthFullLabel(m))}</option>`).join('') + `<option value=""${bf.month === '' ? ' selected' : ''}>All months</option>`;
+    const sopt = [['all','All'],['pending','Pending only'],['done','Completed only']].map(x => `<option value="${x[0]}"${bf.status === x[0] ? ' selected' : ''}>${x[1]}</option>`).join('');
+    const full = bf.month ? missingContractors(type, bf.month).length : 0;
+    const head = bf.month ? monthFullLabel(bf.month) : 'All months';
+    const summary = `<b>${escapeHtml(head)}:</b> ${inMonth + full} ${bf.month ? ((inMonth + full) === 1 ? 'contractor' : 'contractors') : ((inMonth + full) === 1 ? 'record' : 'records')} · <span class="bf-ok"><b>${doneN}</b> completed</span> · <span class="bf-bad"><b>${pendN}</b> pending</span>${bf.month ? ` · <span class="bf-bad"><b>${full}</b> not uploaded yet</span>` : ''}`;
+    bar.innerHTML = `<div><label class="field-label">Month</label><select onchange="setBillFilter('${type}','month',this.value)">${opts}</select></div>
+      <div><label class="field-label">Status</label><select onchange="setBillFilter('${type}','status',this.value)">${sopt}</select></div>
+      <a class="file-link bf-clear" onclick="billFilter['${type}'].month='';billFilter['${type}'].status='all';renderRecordTable('${type}')">Clear</a>
+      <div class="bf-summary">${summary}</div>`;
+  }
 }
 
 function downloadRecordFile(type, id, which){
