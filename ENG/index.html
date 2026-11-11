@@ -406,7 +406,7 @@ const OPT_KEYS={dept:'Concern Department',nature:'Work Nature',process:'Process'
 const ORD=['1st','2nd','3rd','4th','5th','6th','7th','8th','9th','10th'];
 const COMPONENTS=['LID','BODY','BOTTOM'];
 const ROLES={ceo:'CEO',manager:'Manager',production:'Production Team',maintenance:'Maintenance Team',engineering:'Engineering Team'};
-const STATUS={raised:'Pending',approved:'Approved · Lobby',running:'Running',closed:'Closed',denied:'Denied',confirm:'Awaiting Confirmation'};
+const STATUS={raised:'Pending Approval',approved:'Approved · Lobby',running:'Work in Progress',closed:'Closed',denied:'Denied',confirm:'Awaiting Confirmation'};
 
 /* demo accounts (replace with Supabase auth later) */
 const USERS=[{email:'manager@demo.com',name:'Manager',role:'manager',company:null},{email:'ceo@demo.com',name:'CEO',role:'ceo',company:null}];
@@ -709,10 +709,10 @@ function repLabel(t){
 }
 function stText(t){
   if(t.status==='raised'){const l2=(t.lvl||1)===2,rw=t.rw?'Rework · ':'';
-    if(!l2)return t.rw?'Rework · Awaiting Manager':'Pending';
+    if(!l2)return t.rw?'Rework · Awaiting Manager':'Pending Approval';
     if(t.mgrOk&&!t.ceoOk)return rw+'Manager ✔ · awaiting CEO';
     if(t.ceoOk&&!t.mgrOk)return rw+'CEO ✔ · awaiting Manager';
-    return rw+'Pending · awaiting Manager & CEO'}
+    return rw+'Pending Approval · awaiting Manager & CEO'}
   if(t.rw&&['approved','running','confirm'].includes(t.status))return 'Rework · '+STATUS[t.status];
   return STATUS[t.status]}
 const showRw=()=>!!DB.cfg.rework||DB.tickets.some(t=>t.rw>0&&['raised','approved','running','confirm'].includes(t.status));
@@ -1065,7 +1065,7 @@ function card(t,actions,opts){
   let timer='';
   if(t.status==='confirm')timer=`<span class="muted" style="font-size:11px">Waiting for ${esc(t.raisedByName)} to confirm</span> ${clock(t.confirmAt,null,'w')}`;
   if(t.status==='approved')timer=`<span class="muted" style="font-size:11px">Waiting in lobby</span> ${clock(t.decidedAt,null,'w')}`;
-  if(t.status==='running')timer=`<span class="muted" style="font-size:11px">Running · by ${esc(t.acceptedBy)}</span> ${clock(t.acceptedAt,null)}`;
+  if(t.status==='running')timer=`<span class="muted" style="font-size:11px">Work in Progress · by ${esc(t.acceptedBy)}</span> ${clock(t.acceptedAt,null)}`;
   return `<div class="tk ${t.status}">
     <div class="tkh"><span class="lamp ${t.status}"></span><b class="mono">${esc(t.no)}</b><span class="stp ${t.status}">${esc(stText(t))}</span>${t.rw?`<span class="rwb">REWORK #${t.rw}</span>`:''}${(t.lvl||1)===2?'<span class="l2b">LEVEL 2</span>':''}${rep?'<span class="rep">🔁 Repeat</span>':''}<span class="sp"></span><span class="muted mono" style="font-size:11px">${fmtDT(t.raisedAt)}</span></div>
     <div class="tkb">${detailRows(t)}</div>
@@ -1197,7 +1197,7 @@ function exportTickets(arr,name,forceMode){const MD=forceMode||S.mode;
 
 /* ---------- Dashboard ---------- */
 const matchSt=(t,k)=>k==='rework'?(t.rw>0&&['raised','approved','running','confirm'].includes(t.status)):t.status===k;
-const DNAME={raised:'Awaiting approval',approved:'In lobby',running:'Running',confirm:'Awaiting confirmation',rework:'Rework',closed:'Closed',denied:'Denied'};
+const DNAME={raised:'Awaiting approval',approved:'In lobby',running:'Work in Progress',confirm:'Awaiting confirmation',rework:'Rework',closed:'Closed',denied:'Denied'};
 function dview(t){return `<button class="btn sm ghost" data-act="detail" data-id="${t.id}">View</button>`}
 function waitCell(t){return `<span class="tick mono" data-since="${sinceOf(t)}" data-until="">${fmtDur(Date.now()-sinceOf(t))}</span>`}
 function tkNo(t){return `<b>${esc(t.no)}</b>${t.rw?` <span class="rwb">REWORK #${t.rw}</span>`:''}${(t.lvl||1)===2?' <span class="l2b">L2</span>':''}`}
@@ -1235,9 +1235,9 @@ function pageDash(p){
   const tile=(k,n,col,lbl,lamp)=>`<div class="stat${AP?' clk':''}${S.dash.st===k?' sel':''}" ${AP?`data-act="dtile" data-v="${k}"`:''}><div class="n" style="color:${col}">${n}</div><div class="l">${lamp?`<span class="lamp ${lamp}"></span>`:''}${lbl}</div></div>`;
   const cr=k=>l.filter(t=>matchSt(t,k)).length;
   p.innerHTML=`<div class="stats">
-    ${tile('raised',cr('raised'),'var(--blue)','Pending approval','raised')}
+    ${tile('raised',cr('raised'),'var(--blue)','Pending Approval','raised')}
     ${cr('approved')?tile('approved',cr('approved'),'var(--gold)','In lobby','approved'):''}
-    ${tile('running',cr('running'),'var(--ok)','Running (with Engineering)','running')}
+    ${tile('running',cr('running'),'var(--ok)','Work in Progress (with Engineering)','running')}
     ${tile('confirm',cr('confirm'),'#b388ff','Awaiting confirmation','confirm')}
     ${showRw()?tile('rework',cr('rework'),'#ff9f43','Rework',''):''}
     ${tile('closed',cr('closed'),'var(--text)','Closed','closed')}
