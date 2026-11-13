@@ -206,10 +206,10 @@
     padding:18px 32px; border-bottom:1px solid rgba(111,177,232,.18);
     background:rgba(8,20,33,.55); backdrop-filter:blur(4px);
   }
-  .home-brand{ display:flex; align-items:center; gap:12px; }
-  .home-brand img{ width:42px; height:auto; }
-  .home-brand .txt h1{ font-size:17px; color:var(--silver-bright); }
-  .home-brand .txt div{ font-size:10.5px; letter-spacing:.16em; color:var(--steel-light); text-transform:uppercase; margin-top:2px;}
+  .home-brand{ display:flex; align-items:center; gap:22px; }
+  .home-brand img{ width:100px; height:78px; box-sizing:border-box; padding:6px; object-fit:cover; background:#fff; border-radius:14px; box-shadow:0 2px 10px rgba(0,0,0,.35); }
+  .home-brand .txt h1{ font-size:25px; letter-spacing:.02em; color:var(--silver-bright); }
+  .home-brand .txt div{ font-size:13px; letter-spacing:.2em; color:var(--steel-light); text-transform:uppercase; margin-top:2px;}
   .home-user{ display:flex; align-items:center; gap:14px; }
   .home-user-pill{
     display:flex; flex-direction:column; align-items:flex-end;
@@ -400,7 +400,9 @@
   @media(max-width:640px){
     .home-header{ padding:14px 16px; }
     .home-body{ padding:26px 16px 40px; }
-    .home-brand .txt h1{ font-size:14.5px; }
+    .home-brand .txt h1{ font-size:17px; }
+    .home-brand .txt div{ font-size:10px; letter-spacing:.14em; }
+    .home-brand img{ width:64px; height:50px; border-radius:10px; }
     .portal-fab-label{ display:none; }
   }
 </style>
