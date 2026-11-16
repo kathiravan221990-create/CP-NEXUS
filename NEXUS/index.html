@@ -2079,9 +2079,12 @@ function decodeEmbeddedHtml(b64){
   // ---------- Manager login: Default IP mismatch check ----------
   async function checkManagerDefaultMismatch(ip){
     if(!ip) return;
+    if(await IP_SECURITY.isOff()) return;           // switch is OFF (testing): nothing to ask
     const all = await IP_SECURITY.listAll();
     const defaults = all.filter(r => r.type === 'default');
     if(defaults.find(r => r.ip_address === ip)) return; // already a known Default — nothing to do
+    const nowT = new Date();
+    if(all.find(r => r.type === 'temporary' && r.ip_address === ip && (!r.expires_at || new Date(r.expires_at) > nowT))) return; // listed as an active Temporary IP — do not ask
 
     const body = document.getElementById('ipsecMismatchBody');
     body.innerHTML =
