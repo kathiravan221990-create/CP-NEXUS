@@ -7,9 +7,15 @@
   var pushOk = ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window);
 
   function cfg() {
-    try { return { url: SUPABASE_URL, key: SUPABASE_KEY }; } catch (e) { return null; }
+    try { return { url: SUPABASE_URL, key: SUPABASE_KEY }; } catch (e) {}
+    try { return { url: SB_URL, key: SB_KEY }; } catch (e) {}
+    return null;
   }
-  function token() { try { return NEXUS_TOKEN || ''; } catch (e) { return ''; } }
+  function token() {
+    try { return NEXUS_TOKEN || ''; } catch (e) {}
+    try { return TOKEN || ''; } catch (e) {}
+    return '';
+  }
   async function rpc(fn, args) {
     var c = cfg(); if (!c) throw new Error('no config');
     var r = await fetch(c.url.replace(/\/$/, '') + '/rest/v1/rpc/' + fn, {
