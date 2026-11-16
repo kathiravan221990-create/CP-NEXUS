@@ -1,0 +1,22 @@
+name: CP NEXUS safety check
+
+# Runs on every push and on every pull request.
+# Green tick = safe. Red cross = a secret key or broken page was found.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Secret scan and page check
+        run: python3 scripts/check.py
