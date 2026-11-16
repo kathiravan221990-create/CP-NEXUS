@@ -77,8 +77,10 @@ input,select,textarea{font-family:inherit}
 #app{min-height:100vh;display:flex;background:
   radial-gradient(1200px 600px at 85% -10%,rgba(74,163,224,.08),transparent 60%),#0b1830}
 .side{width:206px;flex-shrink:0;background:linear-gradient(180deg,#0a1a38,#071328);border-right:1px solid var(--line);padding:18px 12px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
-.sblogo{background:#fff;border-radius:10px;padding:8px 10px;margin-bottom:8px;display:flex;justify-content:center}
-.sblogo img{width:100%;max-width:150px;height:auto;display:block}
+.nav.raisebtn{justify-content:center;background:linear-gradient(180deg,#f1d98f,#d4a93a);color:#13233d;font-weight:700;font-size:13px;margin:2px 0 12px;border-left:0;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.nav.raisebtn:hover,.nav.raisebtn.on{background:linear-gradient(180deg,#fff0b8,#e6b940);color:#13233d}
+.sblogo{background:#fff;border-radius:8px;padding:5px 8px;margin-bottom:8px;display:flex;justify-content:center}
+.sblogo img{width:100%;max-width:100px;height:auto;display:block}
 .brand-ttl{margin:0 0 3px!important;color:#f1d98f!important;font-weight:700}
 .side .brand-sub{margin-left:2px}
 .nav .ni{font-style:normal;font-size:16px;width:22px;text-align:center;flex:0 0 22px;font-family:"Noto Color Emoji","Apple Color Emoji","Segoe UI Emoji",sans-serif}
@@ -882,7 +884,8 @@ function render(){
      <div class="sblogo">${LOGO_DATA?`<img src="${LOGO_DATA}" alt="Classic Pack">`:GEAR_SVG('gi')}</div>
      <div class="brand-sub brand-ttl">Engineering Work Card</div>
      <div class="brand-sub" id="brand-sub">${esc(brand())}</div>
-     ${items.map(i=>`<div class="nav${S.page===i[0]?' on':''}" data-nav="${i[0]}"><span class="ni">${NAVICO[i[0]]||'•'}</span>${esc(i[1])}${i[2]?`<span class="bd">${i[2]}</span>`:''}</div>`).join('')}
+     ${items.some(i=>i[0]==='raise')?`<div class="nav raisebtn${S.page==='raise'?' on':''}" data-nav="raise"><span class="ni">➕</span>Raise Ticket</div>`:''}
+     ${items.filter(i=>i[0]!=='raise').map(i=>`<div class="nav${S.page===i[0]?' on':''}" data-nav="${i[0]}"><span class="ni">${NAVICO[i[0]]||'•'}</span>${esc(i[1])}${i[2]?`<span class="bd">${i[2]}</span>`:''}</div>`).join('')}
      <div class="sp"></div>
      <div class="who">Signed in as<br><b>${esc(u.name)}</b><br>${esc(ROLES[u.role])}<br><button class="btn" data-act="logout" style="margin-top:10px;width:100%">⏻ Logout</button></div>
    </div>
