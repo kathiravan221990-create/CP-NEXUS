@@ -43,11 +43,23 @@
     '#nxn-setup button.g{background:transparent;color:#9fc3ff;border:1px solid #3a5a96}' +
     '#nxn-list{overflow:auto;flex:1}#nxn-list .it{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.07)}' +
     '#nxn-list .it.u{background:rgba(240,199,90,.10);border-left:3px solid #f0c75a}#nxn-list .t{font-weight:700;color:#fff}#nxn-list .b{color:#b9c7e6;margin-top:2px}#nxn-list .w{color:#7f93bd;font-size:11px;margin-top:3px}' +
-    '#nxn-list .e{padding:22px;text-align:center;color:#7f93bd}';
+    '#nxn-list .e{padding:22px;text-align:center;color:#7f93bd}' +
+    '#nxn-bar{position:fixed;left:0;right:0;top:0;z-index:99995;display:none;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 14px;background:linear-gradient(90deg,#14305f,#0a1a38);border-bottom:2px solid #f0c75a;color:#e8eefc;font:13px Arial,sans-serif}' +
+    '#nxn-bar span{flex:1;min-width:180px}#nxn-bar button{border:0;border-radius:7px;padding:9px 14px;font-weight:700;cursor:pointer;background:#f0c75a;color:#1b1400}#nxn-bar button.g{background:transparent;color:#9fc3ff;border:1px solid #3a5a96}';
   document.head.appendChild(css);
   var bell = document.createElement('button'); bell.id = 'nxn-bell'; bell.title = 'Notifications'; bell.innerHTML = '&#128276;<b id="nxn-cnt"></b>';
   var panel = document.createElement('div'); panel.id = 'nxn-panel';
   panel.innerHTML = '<header><span>Notifications</span><button id="nxn-all">Mark all read</button><button id="nxn-x">&#10005;</button></header><div id="nxn-setup"></div><div id="nxn-list"></div>';
+  var bar = document.createElement('div'); bar.id = 'nxn-bar';
+  bar.innerHTML = '<span>&#128276; Get approval alerts on this phone, even when this page is closed.</span><button id="nxn-bon">Turn on alerts</button><button class="g" id="nxn-bno">Later</button>';
+  document.body.appendChild(bar);
+  bar.querySelector('#nxn-bon').onclick = enable;
+  bar.querySelector('#nxn-bno').onclick = function () { try { localStorage.setItem('nxn_later', String(Date.now())); } catch (e) {} bar.style.display = 'none'; };
+  function barShow() {
+    var later = 0; try { later = +localStorage.getItem('nxn_later') || 0; } catch (e) {}
+    var want = st.tok && pushOk && !iosNeedsInstall && st.perm === 'default' && !st.subbed && (Date.now() - later > 86400000);
+    bar.style.display = want ? 'flex' : 'none';
+  }
   document.body.appendChild(bell); document.body.appendChild(panel);
   bell.onclick = function () { st.open = !st.open; panel.style.display = st.open ? 'flex' : 'none'; if (st.open) { refresh(); } };
   panel.querySelector('#nxn-x').onclick = function () { st.open = false; panel.style.display = 'none'; };
@@ -64,6 +76,7 @@
     else if (st.perm === 'granted' && st.subbed) h = 'Phone alerts: <b>On</b> for this device. They stay on screen until you swipe them away.<br><button class="g" id="nxn-test">Send test alert</button><button class="g" id="nxn-off">Turn off</button>';
     else h = 'Get alerts on this phone even when the portal is closed.<br><button id="nxn-on">Turn on phone alerts</button>';
     S.innerHTML = h;
+    barShow();
     var on = document.getElementById('nxn-on'); if (on) on.onclick = enable;
     var te = document.getElementById('nxn-test'); if (te) te.onclick = testAlert;
     var of = document.getElementById('nxn-off'); if (of) of.onclick = disable;
@@ -119,7 +132,7 @@
     if (t !== st.tok) {
       st.tok = t;
       if (t) { bell.style.display = 'flex'; init(); }
-      else { bell.style.display = 'none'; panel.style.display = 'none'; st.open = false; st.rows = []; st.unread = 0; }
+      else { bell.style.display = 'none'; bar.style.display = 'none'; panel.style.display = 'none'; st.open = false; st.rows = []; st.unread = 0; }
     }
   }, 1500);
   setInterval(function () { if (st.tok && !document.hidden) refresh(); }, 30000);
