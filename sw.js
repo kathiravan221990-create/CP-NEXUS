@@ -22,7 +22,8 @@ self.addEventListener('notificationclick', e => {
   e.notification.close();
   const target = new URL((e.notification.data && e.notification.data.url) || HOME, self.location.origin).href;
   e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-    for (const c of list) { if (c.url.indexOf('/CP-NEXUS/') > -1 && 'focus' in c) return c.focus(); }
+    const want = decodeURIComponent(new URL(target).pathname);
+    for (const c of list) { if (decodeURIComponent(new URL(c.url).pathname) === want && 'focus' in c) return c.focus(); }
     return self.clients.openWindow(target);
   }));
 });
