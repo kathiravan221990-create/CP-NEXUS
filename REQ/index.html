@@ -158,14 +158,17 @@ tr.dtl td{background:rgba(205,150,15,.14)!important;text-align:left}
 .mbox summary{cursor:pointer;font-weight:700;color:var(--navy)}
 /* sidebar layout */
 #side{position:fixed;left:0;top:0;bottom:0;width:184px;background:linear-gradient(180deg,#040f2e,#071845);border-right:2px solid var(--gold);z-index:40;display:flex;flex-direction:column;transition:transform .2s}
-.sbtop{display:flex;align-items:center;gap:8px;padding:10px 10px;border-bottom:1px solid rgba(205,150,15,.35)}
+.sbtop{display:flex;flex-direction:column;align-items:stretch;gap:6px;padding:10px 10px;border-bottom:1px solid rgba(205,150,15,.35)}
+.sblogo{background:#fff;border-radius:10px;padding:8px 10px;display:flex;justify-content:center}
+.sblogo img{width:100%;max-width:140px;height:auto;display:block}
+.sbttl{text-align:center}
 .sbtop .hico{width:32px;height:32px}
 .sbtop b{color:var(--gold2);font-size:12px;letter-spacing:.5px;display:block}
 .sbtop small{opacity:.7;font-size:9px;letter-spacing:1.5px}
 .sbscroll{flex:1;overflow:auto;padding:6px 8px}
 .nvh{font-size:9px;letter-spacing:1.5px;color:var(--gold2);margin:12px 4px 4px;font-weight:700}
 .nv{display:flex;align-items:center;gap:7px;width:100%;white-space:nowrap;background:transparent;border:0;border-left:3px solid transparent;color:#fff;padding:6px 7px;border-radius:6px;font-size:12px;cursor:pointer;text-align:left;font-family:inherit}
-.nv i{font-style:normal;width:16px;text-align:center;font-size:13px}
+.nv i{font-style:normal;width:20px;text-align:center;font-size:15px;font-family:"Noto Color Emoji","Apple Color Emoji","Segoe UI Emoji",sans-serif}
 .nv span{flex:1}
 .nv:hover{background:rgba(205,150,15,.16)}
 .nv.on{background:rgba(205,150,15,.28);border-left-color:var(--gold2);color:var(--gold2);font-weight:700}
@@ -295,9 +298,9 @@ html.in-nexus .top,html.in-nexus header,html.in-nexus .topbar{padding-right:56px
 <div id="app" style="display:none">
  <div id="shade" onclick="closeNav()"></div>
  <aside id="side">
-  <div class="sbtop"><img data-src="icon" class="hico" alt=""><div><b>CP REQUISITION</b><small>PORTAL</small></div></div>
+  <div class="sbtop"><div class="sblogo"><img data-src="logo" alt="Classic Pack"></div><div class="sbttl"><b>CP REQUISITION</b><small>PORTAL</small></div></div>
   <div class="sbscroll"><div id="nav"></div></div>
-  <div class="sbbot"><button class="nv out" onclick="logout()"><i>&#10162;</i><span>Logout</span></button></div>
+  <div class="sbbot"><button class="nv out" onclick="logout()"><i>&#128682;</i><span>Logout</span></button></div>
  </aside>
  <div id="content">
   <header class="topbar">
@@ -2854,7 +2857,7 @@ function render(){
  }
  const L=listShown();
  const allOpen=L.length&&L.every(r=>openRows.has(r.id))&&!collapsed.stats&&!collapsed.dash;
- $('#expbtn').innerHTML=allOpen?'<i>&#9652;</i><span>Collapse all</span>':'<i>&#9662;</i><span>Expand all</span>';
+ $('#expbtn').innerHTML=allOpen?'<i>&#128193;</i><span>Collapse all</span>':'<i>&#128194;</i><span>Expand all</span>';
  $('#tb').innerHTML=L.length?L.map(rowHtml).join(''):'<tr><td colspan="11" class="empty">No requisitions found</td></tr>';
 }
 /* ---------- sidebar ---------- */
@@ -2869,10 +2872,10 @@ function buildNav(){
  h+=N('dashSec','&#128202;','Dashboard');
  h+=N('listSec','&#128196;',lobby?'All Requisitions':'My Requisitions');
  h+='<div class="nvh">OPTIONS</div>';
- h+=A('&#11015;','Download Excel',"exportXlsx(listShown(),'Requisitions');closeNav()");
- h+=A('&#9662;','Expand all',"toggleAll();closeNav()",'expbtn');
- h+=A('&#8635;','Refresh',"load(true);closeNav()");
- if(me==='Manager')h+=A('&#9881;','Settings',"pwModal();closeNav()",'pwbtn');
+ h+=A('&#128229;','Download Excel',"exportXlsx(listShown(),'Requisitions');closeNav()");
+ h+=A('&#128194;','Expand all',"toggleAll();closeNav()",'expbtn');
+ h+=A('&#128260;','Refresh',"load(true);closeNav()");
+ if(me==='Manager')h+=A('&#9881;&#65039;','Settings',"pwModal();closeNav()",'pwbtn');
  $('#nav').innerHTML=h;
  $('#listTitle').textContent=lobby?'All Requisitions':'My Requisitions';
  setActive(lobby?'lobbySec':'dashSec');

@@ -1204,7 +1204,7 @@ function decodeEmbeddedHtml(b64){
 
     function drawTabs(){
       tabs.textContent = '';
-      [['people', 'People (' + users.length + ')'], ['roles', 'Roles (' + roles.length + ')'], ['access', 'Who can open what'], ['tools', 'Tools']].forEach(function(t){
+      [['people', '👤 People (' + users.length + ')'], ['roles', '🛡️ Roles (' + roles.length + ')'], ['access', '🔑 Who can open what'], ['tools', '🧰 Tools']].forEach(function(t){
         const b = mk('button', 'nxu-tab' + (tab === t[0] ? ' on' : ''), t[1]); b.type = 'button'; b.addEventListener('click', function(){ go(t[0]); }); tabs.appendChild(b);
       });
     }

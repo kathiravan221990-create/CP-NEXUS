@@ -77,13 +77,18 @@ input,select,textarea{font-family:inherit}
 #app{min-height:100vh;display:flex;background:
   radial-gradient(1200px 600px at 85% -10%,rgba(74,163,224,.08),transparent 60%),#0b1830}
 .side{width:206px;flex-shrink:0;background:linear-gradient(180deg,#0a1a38,#071328);border-right:1px solid var(--line);padding:18px 12px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.sblogo{background:#fff;border-radius:10px;padding:8px 10px;margin-bottom:8px;display:flex;justify-content:center}
+.sblogo img{width:100%;max-width:150px;height:auto;display:block}
+.brand-ttl{margin:0 0 3px!important;color:#f1d98f!important;font-weight:700}
+.side .brand-sub{margin-left:2px}
+.nav .ni{font-style:normal;font-size:16px;width:22px;text-align:center;flex:0 0 22px;font-family:"Noto Color Emoji","Apple Color Emoji","Segoe UI Emoji",sans-serif}
+@media(max-width:860px){.sblogo{flex:0 0 auto;padding:3px 6px;margin:0 8px 0 0}.sblogo img{width:auto;height:28px}}
 .brand{display:flex;align-items:center;gap:10px;margin-bottom:4px}
 .brand b{font-family:'Fraunces',serif;font-size:14px;letter-spacing:.04em;color:#f1d98f;line-height:1.15}
 .brand-sub{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin:2px 0 22px 46px}
 .nav{display:flex;align-items:center;gap:9px;padding:10px 10px;border-radius:3px;color:#b8c7de;font-size:12px;font-weight:500;cursor:pointer;margin-bottom:3px;border-left:2px solid transparent;user-select:none}
 .nav:hover{background:rgba(255,255,255,.05)}
 .nav.on{background:rgba(169,130,44,.18);color:#fff;border-left-color:var(--gold)}
-.nav .ni{font-size:14px;width:18px;text-align:center}
 .nav .bd{margin-left:auto;background:var(--gold);color:#13233d;font-size:10px;font-weight:700;border-radius:10px;padding:1px 7px}
 .sp{flex:1}
 .who{border-top:1px solid var(--line);padding-top:12px;font-size:10px;color:var(--dim);line-height:1.7}
@@ -853,7 +858,7 @@ const isAppr=isMgr;
 const canSwitch=()=>S.user.role==='manager'||S.user.role==='ceo'||S.user.role==='engineering';
 const brand=()=>S.view==='ALL'?'All Companies':cname(S.view);
 function vis(){return DB.tickets.filter(t=>S.view==='ALL'||t.company===S.view)}
-const NAV_ICO={approvals:'✅',all:'📋',raise:'➕',mine:'🎫',log:'📜',dash:'📊',opts:'⚙️',lobby:'🔔',progress:'🛠️'};
+const NAVICO={"approvals": "✅", "all": "📋", "raise": "➕", "mine": "🎟️", "log": "📜", "dash": "📊", "opts": "🛠️", "lobby": "🔔", "progress": "🔧"};
 function navItems(){
   const u=S.user;
   const cnt=s=>vis().filter(t=>t.status===s).length;
@@ -874,9 +879,10 @@ function render(){
   const sw=canSwitch()?`<div class="sw"><span class="lb" style="margin:0">${isMgr()?'Company':'Unit'}</span><select id="co-switch"><option value="ALL"${S.view==='ALL'?' selected':''}>All Companies</option>${COMPANIES.map(c=>`<option value="${c.code}"${S.view===c.code?' selected':''}>${esc(c.name)}</option>`).join('')}</select></div>`:`<div class="muted" style="font-size:12px">${esc(cname(u.company))}</div>`;
   $('app').innerHTML=`
    <div class="side">
-     <div class="brand">${LOGO_DATA?`<img src="${LOGO_DATA}" alt="Classic Pack" style="width:52px;height:36px;object-fit:cover;border-radius:7px;background:#fff">`:GEAR_SVG('gi')}<b>ENGINEERING<br>WORK CARD</b></div>
+     <div class="sblogo">${LOGO_DATA?`<img src="${LOGO_DATA}" alt="Classic Pack">`:GEAR_SVG('gi')}</div>
+     <div class="brand-sub brand-ttl">Engineering Work Card</div>
      <div class="brand-sub" id="brand-sub">${esc(brand())}</div>
-     ${items.map(i=>`<div class="nav${S.page===i[0]?' on':''}" data-nav="${i[0]}"><span class="ni">${NAV_ICO[i[0]]||'•'}</span>${esc(i[1])}${i[2]?`<span class="bd">${i[2]}</span>`:''}</div>`).join('')}
+     ${items.map(i=>`<div class="nav${S.page===i[0]?' on':''}" data-nav="${i[0]}"><span class="ni">${NAVICO[i[0]]||'•'}</span>${esc(i[1])}${i[2]?`<span class="bd">${i[2]}</span>`:''}</div>`).join('')}
      <div class="sp"></div>
      <div class="who">Signed in as<br><b>${esc(u.name)}</b><br>${esc(ROLES[u.role])}<br><button class="btn" data-act="logout" style="margin-top:10px;width:100%">⏻ Logout</button></div>
    </div>
