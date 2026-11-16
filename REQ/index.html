@@ -3309,5 +3309,6 @@ if(IN_NEXUS){nexusBoot()}else{showLoginMsg('Please open the Requisition Portal f
 if(false)
 (async()=>{const u=sessionStorage.getItem('cp_req_user')||localStorage.getItem('cp_req_user');if(u&&DEPTS.includes(u)&&myName){hold=true;$('#loader').style.display='flex';const t0=Date.now();try{settings=await db.settings()}catch(e){}await start(u);await new Promise(r=>setTimeout(r,Math.max(0,700-(Date.now()-t0))));hold=false;$('#loader').style.display=spin>0?'flex':'none'}})();
 </script>
+<script src="../nx-notify.js"></script>
 </body>
 </html>
