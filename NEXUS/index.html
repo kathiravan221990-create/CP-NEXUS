@@ -1716,8 +1716,17 @@ function decodeEmbeddedHtml(b64){
       row.innerHTML =
         '<div class="ipsec-row-main"><b>' + r.ip_address + '</b>' +
         (r.label ? '<span>' + r.label + '</span>' : '') + '</div>' +
-        '<span class="ipsec-badge ipsec-badge-default">Default</span>';
+        '<span class="ipsec-badge ipsec-badge-default">Default</span>' +
+        '<button class="ipsec-del" data-id="' + r.id + '">Remove</button>';
       defList.appendChild(row);
+    });
+    defList.querySelectorAll('.ipsec-del').forEach(btn => {
+      btn.addEventListener('click', async function(){
+        if(!confirm('Remove this Default IP?\n\nPeople on this network will no longer be able to sign in (Manager and CEO are exempt).')) return;
+        btn.disabled = true; btn.textContent = 'Removing…';
+        await IP_SECURITY.deleteRow(btn.getAttribute('data-id'));
+        openIpSecPanel();
+      });
     });
 
     tempList.innerHTML = temps.length ? '' : '<p class="ipsec-empty">No Temporary IPs active.</p>';
@@ -2073,6 +2082,11 @@ function decodeEmbeddedHtml(b64){
     addTempBtn.textContent = 'Add as Temporary IP (expires in 6 hrs)';
     body.appendChild(addTempBtn);
 
+    const addDefBtn = document.createElement('button');
+    addDefBtn.className = 'btn-primary ipsec-add-new-default';
+    addDefBtn.textContent = 'Add as Default IP (no expiry)';
+    body.appendChild(addDefBtn);
+
     if(defaults.length){
       const divider = document.createElement('p');
       divider.className = 'ipsec-mismatch-intro';
@@ -2093,6 +2107,12 @@ function decodeEmbeddedHtml(b64){
 
     ipsecMismatchModal.classList.add('show');
 
+    addDefBtn.addEventListener('click', async function(){
+      addDefBtn.disabled = true; addDefBtn.textContent = 'Adding…';
+      const ok = await IP_SECURITY.addDefault(ip, 'Added on login');
+      if(!ok){ addDefBtn.disabled = false; addDefBtn.textContent = 'Could not add. Try again, or use Temporary IP'; return; }
+      ipsecMismatchModal.classList.remove('show');
+    });
     addTempBtn.addEventListener('click', async function(){
       addTempBtn.disabled = true; addTempBtn.textContent = 'Adding…';
       await IP_SECURITY.addTemporary(ip, 'Auto-detected on login');
