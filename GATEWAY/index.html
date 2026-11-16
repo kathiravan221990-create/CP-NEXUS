@@ -343,7 +343,7 @@ function wsCheck(login,pw){
   var H={apikey:WS_KEY,"Content-Type":"application/json"};
   return jf(WS_URL+"/auth/v1/token?grant_type=password",{method:"POST",headers:H,body:JSON.stringify({email:login+"@"+LOGIN_DOMAIN,password:pw})}).then(function(a){
     if(!a.ok||!a.json||!a.json.access_token) return null;
-    var tok=a.json.access_token;
+    var tok=a.json.access_token, rtok=a.json.refresh_token||"";
     var H2={apikey:WS_KEY,Authorization:"Bearer "+tok,"Content-Type":"application/json","Content-Profile":"core_api","Accept-Profile":"core_api"};
     return jf(WS_URL+"/rest/v1/rpc/me",{method:"POST",headers:H2,body:"{}"}).then(function(m){
       if(!m.ok||!m.json) return null;
@@ -351,7 +351,7 @@ function wsCheck(login,pw){
         var dept=m.json.department||{}; var tiles=[];
         var rows=Array.isArray(l.json)?l.json:[];
         rows.forEach(function(r){ if(r.active!==false && (r.depts||[]).indexOf(dept.code)>-1) tiles.push({id:r.code,title:r.title}); });
-        return {name:m.json.full_name,code:dept.code,dept:dept.name,tiles:tiles,tok:tok,canManage:((m.json.permissions||{}).core||[]).indexOf('manage_users')>-1};
+        return {name:m.json.full_name,code:dept.code,dept:dept.name,tiles:tiles,tok:tok,rtok:rtok,canManage:((m.json.permissions||{}).core||[]).indexOf('manage_users')>-1};
       });
     });
   }).catch(function(){return null});
@@ -406,7 +406,7 @@ function render(){
     d.appendChild(c);
     var b=document.createElement("button"); b.className="open"; b.type="button";
     b.textContent=state==="ok"?"Open "+title:"Locked"; b.disabled=state!=="ok";
-    if(state==="ok") b.onclick=function(){window.open(url,"_blank","noopener");};
+    if(state==="ok") b.onclick=function(){window.open(handoffUrl(title,url),"_blank","noopener");};
     d.appendChild(b); wrap.appendChild(d);
   }
   if(ws) tile("CP WORKSPACE","Daily work and numbers","ok","Access confirmed for "+ws.dept,ws.tiles.length?ws.tiles:["No screens are set for your department yet."],WS_APP);
@@ -469,12 +469,20 @@ $("form").onsubmit=function(e){
 /* ===== header buttons and full-screen panels (same look as CP NEXUS) ===== */
 var NX_H=function(){return {apikey:NX_KEY,Authorization:"Bearer "+NX_KEY,"Content-Type":"application/json"}};
 var WS_H=function(tok){return {apikey:WS_KEY,Authorization:"Bearer "+tok,"Content-Type":"application/json","Content-Profile":"core_api","Accept-Profile":"core_api"}};
-function signOutAll(){
-  if(!me) return;
-  if(me.ws&&me.ws.tok) fetch(WS_URL+"/auth/v1/logout",{method:"POST",keepalive:true,headers:{apikey:WS_KEY,Authorization:"Bearer "+me.ws.tok}}).catch(function(){});
-  if(me.nx&&me.nx.token) fetch(NX_URL+"/rest/v1/rpc/nexus_logout",{method:"POST",keepalive:true,headers:NX_H(),body:JSON.stringify({p_token:me.nx.token})}).catch(function(){});
+function handoffUrl(title,url){
+  /* one-time pass in the address #fragment (never sent to a server); the app reads it, stores it and clears it */
+  try{
+    if(title==="CP WORKSPACE"&&me&&me.ws&&me.ws.tok){ me.ws.handed=true; return url+"#gw="+encodeURIComponent(btoa(JSON.stringify({a:me.ws.tok,r:me.ws.rtok||""}))); }
+    if(title==="CP NEXUS"&&me&&me.nx&&me.nx.token){ me.nx.handed=true; return url+"#gw="+encodeURIComponent(me.nx.token); }
+  }catch(e){}
+  return url;
 }
-window.addEventListener("pagehide",signOutAll);
+function signOutAll(keepHanded){
+  if(!me) return;
+  if(me.ws&&me.ws.tok&&!(keepHanded&&me.ws.handed)) fetch(WS_URL+"/auth/v1/logout",{method:"POST",keepalive:true,headers:{apikey:WS_KEY,Authorization:"Bearer "+me.ws.tok}}).catch(function(){});
+  if(me.nx&&me.nx.token&&!(keepHanded&&me.nx.handed)) fetch(NX_URL+"/rest/v1/rpc/nexus_logout",{method:"POST",keepalive:true,headers:NX_H(),body:JSON.stringify({p_token:me.nx.token})}).catch(function(){});
+}
+window.addEventListener("pagehide",function(){signOutAll(true);});
 function openFs(title,sub){ $("fsT").textContent=title; $("fsS").textContent=sub; $("fsBody").innerHTML=""; show($("fs"),true); document.body.style.overflow="hidden"; }
 $("fsBack").onclick=function(){ show($("fs"),false); $("fsBody").innerHTML=""; document.body.style.overflow=""; };
 function el(tag,cls,text){var e=document.createElement(tag); if(cls)e.className=cls; if(text!=null)e.textContent=text; return e;}

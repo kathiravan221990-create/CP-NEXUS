@@ -955,6 +955,15 @@ function decodeEmbeddedHtml(b64){
   // ---------- INDIVIDUAL LOGINS (username + password, roles managed by the Manager) ----------
   const LEGACY_LOGIN_ENABLED = false;          // set to false at cut-over to switch off the shared department passwords
   const TOKEN_KEY = 'nexus_token';
+  // ---------- GATEWAY OF CP: sign-in happens only on the Gateway page ----------
+  const GATEWAY_URL = 'https://kathiravan221990-create.github.io/CP-NEXUS/GATEWAY/';
+  function goGateway(){ try { location.replace(GATEWAY_URL); } catch(e){} }
+  (function takeGatewayPass(){
+    try {
+      const m = /[#&]gw=([^&]+)/.exec(location.hash || '');
+      if(m){ localStorage.setItem(TOKEN_KEY, decodeURIComponent(m[1])); history.replaceState(null, '', location.pathname + location.search); }
+    } catch(e){}
+  })();
   let sessionTimer = null;
   function endSessionLocally(message){
     if(sessionTimer){ clearInterval(sessionTimer); sessionTimer = null; }
@@ -968,7 +977,7 @@ function decodeEmbeddedHtml(b64){
     if(plinksModal) plinksModal.classList.remove('show');
     document.getElementById('portal-frame').srcdoc = '';
     show('login');
-    if(message){ showLoginError(message); }
+    if(message){ showLoginError(message); } else { goGateway(); }
   }
   const LOGIN_ERR_DEPT = loginError.textContent;
   let loginMode = 'user';
@@ -2207,7 +2216,7 @@ function decodeEmbeddedHtml(b64){
     let res = null;
     try { res = await IP_SECURITY.sb.rpc('nexus_session', { p_token: tk }); } catch(e){ res = { error: e }; }
     if(res.error){ show('login'); return; }                       // offline: stay signed out for now, keep the token
-    if(!res.data){ setToken(null); show('login'); return; }       // expired / disabled: sign in again
+    if(!res.data){ setToken(null); goGateway(); return; }         // expired / disabled: sign in again on the Gateway
     const cur = userToCurrent(res.data);
     const ip = await IP_SECURITY.fetchPublicIp();
     const chk = await IP_SECURITY.isIpAllowed(ip);
@@ -2226,6 +2235,7 @@ function decodeEmbeddedHtml(b64){
   (async function restoreSession(){
     const tokenSaved = getToken();
     if(tokenSaved){ await restoreUserSession(tokenSaved); return; }
+    goGateway(); return;                                           // no sign-in here: go to the Gateway
     if(!LEGACY_LOGIN_ENABLED){ clearSession(); return; }
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch(e){}
