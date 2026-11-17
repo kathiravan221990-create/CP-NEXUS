@@ -961,7 +961,7 @@ function decodeEmbeddedHtml(b64){
   (function takeGatewayPass(){
     try {
       const m = /[#&]gw=([^&]+)/.exec(location.hash || '');
-      if(m){ localStorage.setItem(TOKEN_KEY, decodeURIComponent(m[1])); history.replaceState(null, '', location.pathname + location.search); }
+      if(m){ localStorage.setItem(TOKEN_KEY, decodeURIComponent(m[1])); try { sessionStorage.setItem('nx_via_gw','1'); } catch(e2){} history.replaceState(null, '', location.pathname + location.search); }
     } catch(e){}
   })();
   let sessionTimer = null;
@@ -2228,14 +2228,27 @@ function decodeEmbeddedHtml(b64){
       ipAccessError.classList.add('show');
       return;
     }
+    let viaGw = false; try { viaGw = sessionStorage.getItem('nx_via_gw') === '1'; } catch(e){}
+    if(!viaGw && !(isMgr(cur.dept) || cur.dept.isAdmin) && (await getAccessMode()) === '1'){ show('login'); showGatewayOnly(); return; }   // mode 1: only the Gateway hand-over, or an Administrator
     currentUser = cur;
     enterHome(ip);
     if(cur.mustChange) openChangePw(true);
   }
+  async function getAccessMode(){ try { const r = await IP_SECURITY.sb.rpc('get_access_mode'); if(r.error || !r.data) return '3'; return String(r.data); } catch(e){ return '3'; } }
+  function showGatewayOnly(){
+    const bx = document.createElement('div'); bx.id = 'gatewayOnly';
+    bx.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 30% 20%,#12304f,#07121f);font-family:Arial,sans-serif;color:#eef3f8';
+    bx.innerHTML = '<div style="width:min(560px,92vw);text-align:center;padding:44px 40px;border-radius:22px;background:rgba(13,32,51,.88);border:1px solid rgba(224,188,99,.4)"><div style="font-size:44px">&#128274;</div><h1 style="margin:14px 0 8px;font-size:24px;color:#e0bc63;letter-spacing:.04em">PLEASE OPEN VIA GATEWAY OF CP</h1><p style="margin:0 0 26px;color:#b9c8d6;font-size:16px;line-height:1.5">CP NEXUS no longer opens on its own.<br>Sign in once at the Gateway of CP and open it from your tile.</p><a href="' + GATEWAY_URL + '" style="display:inline-block;background:linear-gradient(180deg,#f0cf7a,#c9a13f);color:#1b1405;text-decoration:none;font-weight:700;padding:13px 30px;border-radius:12px;font-size:16px">Go to Gateway of CP</a></div>';
+    document.body.appendChild(bx);
+    try { document.getElementById('loading').classList.remove('show'); } catch(e){}
+  }
   (async function restoreSession(){
     const tokenSaved = getToken();
     if(tokenSaved){ await restoreUserSession(tokenSaved); return; }
-    goGateway(); return;                                           // no sign-in here: go to the Gateway
+    // ACCESS MODE: 1 = Gateway only (message page), 2 = NEXUS may open directly, 3 = everything opens
+    const amode = await getAccessMode();   // cannot read the setting: treated as 3 so nobody is locked out
+    if(amode === '1'){ showGatewayOnly(); return; }
+    show('login'); return;                                         // modes 2 and 3: NEXUS may open on its own
     if(!LEGACY_LOGIN_ENABLED){ clearSession(); return; }
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch(e){}

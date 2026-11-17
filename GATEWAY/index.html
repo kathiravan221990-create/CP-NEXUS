@@ -250,7 +250,7 @@ main h2{font-size:24px;color:var(--bright)}
       <div class="pill"><b id="uname"></b><span id="udept"></span></div>
       <button id="bell" type="button" title="Notifications" aria-label="Notifications">&#128276;<b id="bellCnt">0</b></button>
       <button class="hbtn" id="bPw" type="button">🔑 Change Password</button>
-      <button class="hbtn" id="bUsers" type="button" style="display:none">👥 Users &amp; Roles</button>
+      <button class="hbtn" id="bUsers" type="button" style="display:none">👥 Users &amp; Departments</button>
       <button class="hbtn" id="btnIpSec" type="button" style="display:none"><span>🔒 IP Security</span></button>
       <button class="hbtn" id="out" type="button">🚪 Log Out</button>
     </div>
@@ -682,6 +682,15 @@ var NEXUS_CONFIG={portals:[],departments:[]};
     last_admin: 'You cannot remove the last active administrator.', role_in_use: 'This role still has users. Move them to another role first.',
     admin_role: 'The administrator role cannot be deleted.', not_found: 'Not found.'
   };
+  const WS_MODS = {'Administrator':['PAYROLL','PMS','COST'],'HR & Admin':['PAYROLL','PMS','COST'],'Manager':['PAYROLL','PMS','COST'],'Production':['PMS'],'SCM':['PMS']};
+  function wsChips(deptName, withNexus){
+    const d = mk('div'); d.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap';
+    const m = WS_MODS[deptName] || [];
+    function chip(t, off){ const c = mk('span', '', t); c.style.cssText = 'padding:2px 9px;border-radius:12px;font-size:12px;' + (off ? 'background:rgba(255,255,255,.05);color:#6c7f92' : 'background:rgba(111,177,232,.16);color:#9ccdf5'); return c; }
+    if(m.length){ m.forEach(function(x){ d.appendChild(chip(x)); }); } else { d.appendChild(chip('no WORKSPACE access', true)); }
+    if(withNexus) d.appendChild(chip('NEXUS'));
+    return d;
+  }
   function mk(tag, cls, text){ const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; }
   function randomPassword(){
     const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'; const a = new Uint32Array(10);
@@ -751,8 +760,8 @@ var NEXUS_CONFIG={portals:[],departments:[]};
     nxuStyle();
     const old = document.getElementById('nexusUsersModal'); if(old) old.remove();
     const ov = mk('div'); ov.id = 'nexusUsersModal';
-    const top = mk('div', 'nxu-top'); const tl = mk('div'); tl.appendChild(mk('h2', '', 'USERS & ROLES'));
-    tl.appendChild(mk('p', '', 'Add people, choose their role, reset passwords and see who can open what.'));
+    const top = mk('div', 'nxu-top'); const tl = mk('div'); tl.appendChild(mk('h2', '', 'USERS & DEPARTMENTS'));
+    tl.appendChild(mk('p', '', 'Add people, choose their department, reset passwords and see who can open what, in CP WORKSPACE and CP NEXUS.'));
     const back = mk('button', 'nxu-back', '← Back to Home'); back.type = 'button'; back.addEventListener('click', function(){ ov.remove(); });
     top.appendChild(tl); top.appendChild(back); ov.appendChild(top);
     const tabs = mk('div', 'nxu-tabs'); ov.appendChild(tabs);
@@ -772,7 +781,7 @@ var NEXUS_CONFIG={portals:[],departments:[]};
     const roleName = {}; roles.forEach(function(r){ roleName[r.role_id] = r.name; });
     function roleSelect(sel, withAll){
       const s2 = mk('select');
-      if(withAll){ const o0 = mk('option', '', 'All roles'); o0.value = ''; s2.appendChild(o0); }
+      if(withAll){ const o0 = mk('option', '', 'All departments'); o0.value = ''; s2.appendChild(o0); }
       roles.forEach(function(r){ const o = mk('option', '', r.name + (r.active ? '' : ' (off)')); o.value = r.role_id; s2.appendChild(o); });
       if(!withAll) s2.value = sel || (activeRoles[0] && activeRoles[0].role_id); else s2.value = sel || '';
       return s2;
@@ -793,7 +802,7 @@ var NEXUS_CONFIG={portals:[],departments:[]};
 
     function drawTabs(){
       tabs.textContent = '';
-      [['people', '👤 People (' + users.length + ')'], ['roles', '🛡️ Roles (' + roles.length + ')'], ['access', '🔑 Who can open what'], ['tools', '🧰 Tools']].forEach(function(t){
+      [['people', '👤 People (' + users.length + ')'], ['roles', '🛡️ Departments (' + roles.length + ')'], ['access', '🔑 Who can open what'], ['mode', '⚙️ Access mode'], ['tools', '🧰 Tools']].forEach(function(t){
         const b = mk('button', 'nxu-tab' + (tab === t[0] ? ' on' : ''), t[1]); b.type = 'button'; b.addEventListener('click', function(){ go(t[0]); }); tabs.appendChild(b);
       });
     }
@@ -816,7 +825,7 @@ var NEXUS_CONFIG={portals:[],departments:[]};
       const nr = roleSelect(); const np = mk('input'); np.type = 'text'; np.placeholder = 'min 8 characters'; np.autocomplete = 'off'; np.value = randomPassword();
       const ng = mk('button', 'nxu-btn ghost', 'New random password'); ng.type = 'button'; ng.addEventListener('click', function(){ np.value = randomPassword(); });
       const addBtn = mk('button', 'nxu-btn', 'Add person'); addBtn.type = 'button';
-      add.appendChild(fld('Username', nu)); add.appendChild(fld('Display name', nn)); add.appendChild(fld('Role', nr)); add.appendChild(fld('Temporary password', np));
+      add.appendChild(fld('Username', nu)); add.appendChild(fld('Display name', nn)); add.appendChild(fld('Department', nr)); add.appendChild(fld('Temporary password', np));
       const bw = mk('div'); bw.style.display = 'flex'; bw.style.gap = '8px'; bw.style.flexWrap = 'wrap'; bw.appendChild(ng); bw.appendChild(addBtn); add.appendChild(bw);
       wrap.appendChild(add);
       addToggle.addEventListener('click', function(){ add.classList.toggle('open'); if(add.classList.contains('open')) nu.focus(); });
@@ -835,7 +844,7 @@ var NEXUS_CONFIG={portals:[],departments:[]};
       wrap.appendChild(box);
 
       const tw = mk('div', 'nxu-tw'); const tbl = mk('table', 'nxu-tbl');
-      const hr = mk('tr'); ['Person', 'Display name', 'Role', 'Status', 'Last sign-in', 'Actions'].forEach(function(h){ hr.appendChild(mk('th', '', h)); });
+      const hr = mk('tr'); ['Person', 'Display name', 'Department', 'Can open', 'Status', 'Last sign-in', 'Actions'].forEach(function(h){ hr.appendChild(mk('th', '', h)); });
       const th = mk('thead'); th.appendChild(hr); tbl.appendChild(th);
       const tb = mk('tbody'); tbl.appendChild(tb); tw.appendChild(tbl); wrap.appendChild(tw);
       const empty = mk('p', 'nxu-hint', 'No one matches. Change the search or filters.'); empty.style.display = 'none'; empty.style.marginTop = '12px'; wrap.appendChild(empty);
@@ -881,7 +890,8 @@ var NEXUS_CONFIG={portals:[],departments:[]};
           if(!r.ok){ box.insertBefore(note(errText(r), true), box.firstChild); return; }
           await refresh(note('Deleted ' + u.username + '.', false));
         });
-        [c1, c2, c3, c4, c5, c6].forEach(function(c){ tr.appendChild(c); });
+        const cOpen = mk('td'); cOpen.appendChild(wsChips(roleName[u.role_id] || '', true)); rs.addEventListener('change', function(){ cOpen.textContent=''; cOpen.appendChild(wsChips(roleName[rs.value] || '', true)); });
+        [c1, c2, c3, cOpen, c4, c5, c6].forEach(function(c){ tr.appendChild(c); });
         tb.appendChild(tr);
         rows.push({ tr: tr, u: u, name: name, rs: rs, acb: acb });
       });
@@ -905,17 +915,17 @@ var NEXUS_CONFIG={portals:[],departments:[]};
       const ri = mk('input'); ri.type = 'text'; ri.placeholder = 'e.g. quality'; const rnn = mk('input'); rnn.type = 'text'; rnn.placeholder = 'e.g. Quality';
       const rsw = mk('label', 'nxu-sw'); const rac = mk('input'); rac.type = 'checkbox'; rsw.appendChild(rac); rsw.appendChild(document.createTextNode('Administrator'));
       const rbtn = mk('button', 'nxu-btn', 'Add role'); rbtn.type = 'button';
-      add.appendChild(fld('Role id (letters, numbers, _)', ri)); add.appendChild(fld('Role name', rnn)); add.appendChild(fld('Rights', rsw)); add.appendChild(rbtn);
+      add.appendChild(fld('Department code (letters, numbers, _)', ri)); add.appendChild(fld('Department name', rnn)); add.appendChild(fld('Rights', rsw)); add.appendChild(rbtn);
       wrap.appendChild(add);
       rbtn.addEventListener('click', async function(){
         const r = await adminCall('nexus_admin_save_role', { p_role_id: ri.value, p_name: rnn.value, p_is_admin: rac.checked, p_active: true });
         if(!r.ok){ box.insertBefore(note(errText(r), true), box.firstChild); return; }
-        await refresh(note('Role added. Choose which tiles it sees in Portal Links.', false));
+        await refresh(note('Department added. Choose which tiles it sees in Who can open what.', false));
       });
       if(noteEl) box.insertBefore(noteEl, box.firstChild);
       wrap.appendChild(box);
       const tw = mk('div', 'nxu-tw'); const tbl = mk('table', 'nxu-tbl');
-      const hr = mk('tr'); ['Role', 'Name', 'Administrator', 'Status', 'People', 'Actions'].forEach(function(h){ hr.appendChild(mk('th', '', h)); });
+      const hr = mk('tr'); ['Code', 'Name', 'Administrator', 'CP WORKSPACE modules', 'Status', 'People', 'Actions'].forEach(function(h){ hr.appendChild(mk('th', '', h)); });
       const th = mk('thead'); th.appendChild(hr); tbl.appendChild(th); const tb = mk('tbody'); tbl.appendChild(tb); tw.appendChild(tbl); wrap.appendChild(tw);
       roles.forEach(function(r){
         const tr = mk('tr'); const cnt = users.filter(function(u){ return u.role_id === r.role_id; }).length;
@@ -941,7 +951,8 @@ var NEXUS_CONFIG={portals:[],departments:[]};
           if(!res.ok){ box.insertBefore(note(errText(res), true), box.firstChild); return; }
           await refresh(note('Deleted role ' + r.role_id + '.', false));
         });
-        [c1, c2, c3, c4, c5, c6].forEach(function(c){ tr.appendChild(c); });
+        const cMod = mk('td'); cMod.appendChild(wsChips(r.name, false));
+        [c1, c2, c3, cMod, c4, c5, c6].forEach(function(c){ tr.appendChild(c); });
         tb.appendChild(tr);
       });
     }
@@ -968,6 +979,39 @@ var NEXUS_CONFIG={portals:[],departments:[]};
     }
 
     // ================= TOOLS =================
+    async function drawMode(noteEl){
+      if(noteEl) box.appendChild(noteEl); wrap.appendChild(box);
+      const cur = await adminCall('nexus_admin_get_access_mode');
+      let mode = (cur && cur.ok && cur.mode) ? String(cur.mode) : '1';
+      const opts = [
+        ['1', '1 click · Gateway only', 'Only the Gateway of CP login opens. CP WORKSPACE, CP NEXUS and every app show "Please open via Gateway of CP" when opened directly.'],
+        ['2', '2 clicks · Gateway + the two systems', 'The Gateway, CP WORKSPACE and CP NEXUS open. PMS, PAYROLL, COST, CP Portal Live, ENG, REQ and SEC open only through their own system.'],
+        ['3', 'Multiple · everything opens', 'Every link opens on its own, as before. Use this only while testing.']
+      ];
+      const p = mk('p', 'nxu-hint', 'Choose how people may open our applications. Administrators can always sign in directly, whatever is chosen here.'); wrap.appendChild(p);
+      const card = mk('div', 'nxu-card'); card.style.maxWidth = '820px';
+      const radios = [];
+      opts.forEach(function(o){
+        const row = mk('div', ''); row.style.cssText = 'cursor:pointer;white-space:normal;display:flex;align-items:flex-start;gap:12px;padding:12px 4px;margin:0;border-bottom:1px solid rgba(201,210,218,.1);width:100%';
+        const r = mk('input'); r.type = 'radio'; r.name = 'accmode'; r.value = o[0]; r.checked = (mode === o[0]); r.style.cssText = 'flex:none;width:18px !important;height:18px;margin:3px 0 0 0 !important;padding:0;accent-color:#e0bc63'; radios.push(r);
+        const t = mk('div'); t.style.cssText = 'flex:1;text-align:left'; const h = mk('div', '', o[1]); h.style.cssText = 'font-size:16px;font-weight:600;color:#eef3f8 !important;text-transform:none;letter-spacing:0;white-space:normal'; const d = mk('div', '', o[2]); d.style.cssText = 'margin-top:3px;font-size:13px;color:#9fb0c1 !important;text-transform:none;letter-spacing:0;font-weight:400;line-height:1.4;white-space:normal'; t.appendChild(h); t.appendChild(d);
+        row.appendChild(r); row.appendChild(t); card.appendChild(row); row.addEventListener('click', function(e){ if(e.target !== r){ r.checked = true; r.dispatchEvent(new Event('change')); } });
+      });
+      const bar = mk('div'); bar.style.cssText = 'display:flex;gap:12px;align-items:center;margin-top:16px';
+      const save = mk('button', 'nxu-btn', 'Save access mode'); save.type = 'button'; save.disabled = true;
+      const st = mk('span', '', 'Currently: ' + opts.filter(function(o){ return o[0] === mode; })[0][1]);
+      radios.forEach(function(r){ r.addEventListener('change', function(){ save.disabled = !radios.some(function(x){ return x.checked && x.value !== mode; }); }); });
+      save.addEventListener('click', async function(){
+        const v = radios.filter(function(x){ return x.checked; })[0].value;
+        save.disabled = true; save.textContent = 'Saving…';
+        const r = await adminCall('nexus_admin_set_access_mode', { p_mode: v });
+        save.textContent = 'Save access mode';
+        if(!r.ok){ box.insertBefore(note(errText(r), true), box.firstChild); save.disabled = false; return; }
+        mode = v; st.textContent = 'Currently: ' + opts.filter(function(o){ return o[0] === mode; })[0][1];
+        box.insertBefore(note('Access mode saved.', false), box.firstChild);
+      });
+      st.style.cssText = 'font-size:13px;color:#9fb0c1;text-transform:none;letter-spacing:0'; bar.appendChild(save); bar.appendChild(st); card.appendChild(bar); wrap.appendChild(card);
+    }
     function drawTools(){
       const chk = mk('div', 'nxu-card'); chk.appendChild(mk('b', '', 'Server check'));
       chk.appendChild(mk('p', 'nxu-hint', 'Confirms the database recognises your Nexus login. Run it if an app says it cannot see your sign-in.'));
@@ -991,6 +1035,7 @@ var NEXUS_CONFIG={portals:[],departments:[]};
       if(tab === 'people') drawPeople(noteEl);
       else if(tab === 'roles') drawRoles(noteEl);
       else if(tab === 'access') drawAccess();
+      else if(tab === 'mode') drawMode(noteEl);
       else drawTools();
     }
     draw(keepNote);
