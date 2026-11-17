@@ -424,14 +424,14 @@ function render(){
  const emP=em.filter(x=>x.status==='PENDING');const n=wc.length+rq.length+emP.length;
  document.title=(n?'('+n+') ':'')+'CP Approvals';
  const tile=(k,c,l,a)=>`<button class="tile${filter===k?' on':''}" onclick="filter='${k}';render()"><b>${c}</b><span>${l}</span><em>${inr(a)}</em></button>`;
- $('#tiles').innerHTML=tile('ALL',n,'All pending',wcAmt()+rqAmt())+tile('WC',wc.length,'Work Cards',wcAmt())+tile('RQ',rq.length,'Requisitions',rqAmt())+(ME&&ME.role==='manager'?`<button class="tile${filter==='EM'?' on':''}" onclick="filter='EM';render()"><b>${emP.length}</b><span>New Employees</span><em>&nbsp;</em></button>`:'');
+ $('#tiles').innerHTML=tile('WC',wc.length,'Work Cards',wcAmt())+tile('RQ',rq.length,'Requisitions',rqAmt())+(ME&&ME.role==='manager'?`<button class="tile${filter==='EM'?' on':''}" onclick="filter='EM';render()"><b>${emP.length}</b><span>New Employees</span><em>&nbsp;</em></button>`:'')+tile('ALL',n,'All pending',wcAmt()+rqAmt());
  const s=q.trim().toLowerCase();
  let items=[];
  if(filter!=='RQ'&&filter!=='EM')wc.forEach(t=>items.push({k:'WC',id:t.id,ts:t.raised_at,t}));
  if(filter!=='WC'&&filter!=='EM')rq.forEach(r=>items.push({k:'RQ',id:r.id,ts:new Date(r.raised_at||r.created_at).getTime(),t:r}));
  if(ME&&ME.role==='manager'&&(filter==='ALL'||filter==='EM'))emP.forEach(x=>items.push({k:'EM',id:x.emp_id,ts:new Date(x.prepared_at||0).getTime(),t:x}));
  if(s)items=items.filter(i=>JSON.stringify(i.t).toLowerCase().includes(s));
- items.sort((a,b)=>a.ts-b.ts);
+ const gr={WC:0,RQ:1,EM:2};items.sort((a,b)=>gr[a.k]-gr[b.k]||a.ts-b.ts);
  $('#list').innerHTML=items.length?items.map(i=>i.k==='WC'?wcCard(i.t):i.k==='EM'?emCard(i.t):rqCard(i.t)).join(''):`<div class="empty"><big>&#9989;</big>${n?'Nothing matches your search.':'Nothing is waiting for your approval.'}</div>`;
 }
 function wcCard(t){
