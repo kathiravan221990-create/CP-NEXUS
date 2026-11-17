@@ -406,7 +406,7 @@ function render(){
     d.appendChild(c);
     var b=document.createElement("button"); b.className="open"; b.type="button";
     b.textContent=state==="ok"?"Open "+title:"Locked"; b.disabled=state!=="ok";
-    if(state==="ok") b.onclick=function(){window.open(handoffUrl(title,url),"_blank","noopener");};
+    if(state==="ok") b.onclick=function(){window.location.assign(handoffUrl(title,url));};
     d.appendChild(b); wrap.appendChild(d);
   }
   if(ws) tile("CP WORKSPACE","Daily work and numbers","ok","Access confirmed for "+ws.dept,ws.tiles.length?ws.tiles:["No screens are set for your department yet."],WS_APP);
