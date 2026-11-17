@@ -1499,6 +1499,7 @@ async function deleteRecord(type, id){
 
 function openMidModal(type, id){
   editingMidId = null;
+  document.getElementById('mid-date').closest('.form-row').style.display = '';
   document.getElementById('mid-save-btn').textContent = 'Save';
   activeMidType = type;
   activeMidId = id;
@@ -1522,9 +1523,10 @@ function editMid(type, id){
   const cfg = COMPLIANCE_TYPES[type];
   document.getElementById('mid-modal-title').textContent = 'Edit ' + cfg.midModalTitle.replace(/^Upload\s+/i,'');
   document.getElementById('mid-modal-hint').textContent = cfg.midHint;
-  document.getElementById('mid-file-label').textContent = cfg.midFileLabel + ' (leave blank to keep existing file)';
+  document.getElementById('mid-file-label').textContent = cfg.midFileLabel + ' (choose the new ECR file)';
   document.getElementById('mid-file').value = '';
   document.getElementById('mid-date').value = rec.mid_date || '';
+  document.getElementById('mid-date').closest('.form-row').style.display = 'none'; // date is not editable
   document.getElementById('mid-save-btn').textContent = 'Save Changes';
   openModal('mid-modal');
 }
@@ -1535,7 +1537,7 @@ async function saveMid(){
   const fileInput = document.getElementById('mid-file');
   const date = document.getElementById('mid-date').value;
   const isEdit = !!editingMidId;
-  if(!isEdit && !fileInput.files[0]){ toast('Please upload the ' + cfg.midFileLabel.toLowerCase() + ' before saving.'); return; }
+  if(!fileInput.files[0]){ toast('Please upload the ' + cfg.midFileLabel.toLowerCase() + ' before saving.'); return; }
 
   const saveBtn = document.getElementById('mid-save-btn');
   if(saveBtn.disabled) return;
@@ -1544,8 +1546,8 @@ async function saveMid(){
   saveBtn.textContent = 'Saving…';
 
   try{
-    const updateFields = { mid_date: date || null };
-    if(!isEdit) updateFields.status = 'mid';
+    const updateFields = {};
+    if(!isEdit){ updateFields.mid_date = date || null; updateFields.status = 'mid'; }
     if(fileInput.files[0]){
       const f = fileInput.files[0];
       const path = fileToPath('bills/' + type, f.name);
