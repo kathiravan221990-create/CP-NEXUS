@@ -741,6 +741,7 @@ let dashboardMonthFilter = ''; // '' = all months, else 'YYYY-MM'
 let activeRecordType = 'labour';
 let activePaidType = 'labour';
 let activePaidId = null;
+let editingMidId = null;
 let editingPaidId = null; // set when the Paid Challan modal was opened via the edit (pencil) icon
 let activeMidType = 'pf';
 let activeMidId = null;
@@ -1361,7 +1362,7 @@ function renderRecordTableCore(type, list){
     let datePaidCell = '';
     let actionBtn = '';
     if(cfg.stages === 3){
-      midCell = `<td class="dl-cell">${r.mid_file_path ? bkDoneHtml(r,'mid',downloadIconHtml(`downloadRecordFile('${type}','${r.id}','mid')`, `previewRecordFile('${type}','${r.id}','mid')`)) : '<span class="muted">—</span>'}</td>`;
+      midCell = `<td class="dl-cell">${r.mid_file_path ? bkDoneHtml(r,'mid',downloadIconHtml(`downloadRecordFile('${type}','${r.id}','mid')`, `previewRecordFile('${type}','${r.id}','mid')`)) + (currentRole==='hr' ? inlineEditIconHtml('Edit ' + cfg.midFileLabel, `editMid('${type}','${r.id}')`) : '') : '<span class="muted">—</span>'}</td>`;
       // Date Paid is shown right after Actual Paid ₹.
       datePaidCell = `<td class="mono">${r.completion_date ? escapeHtml(r.completion_date) : '<span class="muted">—</span>'}</td>`;
       if(r.actual_paid_amount != null){
@@ -1497,6 +1498,8 @@ async function deleteRecord(type, id){
 }
 
 function openMidModal(type, id){
+  editingMidId = null;
+  document.getElementById('mid-save-btn').textContent = 'Save';
   activeMidType = type;
   activeMidId = id;
   const cfg = COMPLIANCE_TYPES[type];
@@ -1508,12 +1511,31 @@ function openMidModal(type, id){
   openModal('mid-modal');
 }
 
+/* Edit (pencil icon) on an already-uploaded ECR — fix the date and/or replace the file.
+   Leaving the file blank keeps the existing upload; the bill's status is never changed. */
+function editMid(type, id){
+  const rec = recordIndexes[type].find(r => r.id === id);
+  if(!rec) return;
+  activeMidType = type;
+  activeMidId = id;
+  editingMidId = id;
+  const cfg = COMPLIANCE_TYPES[type];
+  document.getElementById('mid-modal-title').textContent = 'Edit ' + cfg.midModalTitle.replace(/^Upload\s+/i,'');
+  document.getElementById('mid-modal-hint').textContent = cfg.midHint;
+  document.getElementById('mid-file-label').textContent = cfg.midFileLabel + ' (leave blank to keep existing file)';
+  document.getElementById('mid-file').value = '';
+  document.getElementById('mid-date').value = rec.mid_date || '';
+  document.getElementById('mid-save-btn').textContent = 'Save Changes';
+  openModal('mid-modal');
+}
+
 async function saveMid(){
   const type = activeMidType;
   const cfg = COMPLIANCE_TYPES[type];
   const fileInput = document.getElementById('mid-file');
   const date = document.getElementById('mid-date').value;
-  if(!fileInput.files[0]){ toast('Please upload the ' + cfg.midFileLabel.toLowerCase() + ' before saving.'); return; }
+  const isEdit = !!editingMidId;
+  if(!isEdit && !fileInput.files[0]){ toast('Please upload the ' + cfg.midFileLabel.toLowerCase() + ' before saving.'); return; }
 
   const saveBtn = document.getElementById('mid-save-btn');
   if(saveBtn.disabled) return;
@@ -1522,20 +1544,24 @@ async function saveMid(){
   saveBtn.textContent = 'Saving…';
 
   try{
-    const f = fileInput.files[0];
-    const path = fileToPath('bills/' + type, f.name);
-    try{ await uploadFile(path, f); }catch(e){ toast('File upload failed: ' + e.message); return; }
-
-    const { error } = await sb.from('bills').update({
-      mid_file_path: path, mid_file_name: f.name,
-      mid_date: date || null, status: 'mid'
-    }).eq('id', activeMidId);
+    const updateFields = { mid_date: date || null };
+    if(!isEdit) updateFields.status = 'mid';
+    if(fileInput.files[0]){
+      const f = fileInput.files[0];
+      const path = fileToPath('bills/' + type, f.name);
+      try{ await uploadFile(path, f); }catch(e){ toast('File upload failed: ' + e.message); return; }
+      updateFields.mid_file_path = path;
+      updateFields.mid_file_name = f.name;
+    }
+    const { error } = await sb.from('bills').update(updateFields).eq('id', activeMidId);
     if(error){ toast('Could not save: ' + error.message); return; }
 
     closeModal('mid-modal');
+    const wasEditMid = isEdit;
+    editingMidId = null;
     await loadBills(type);
     renderRecordTable(type); renderDashboard();
-    toast('Marked as ' + cfg.midStatusLabel.toLowerCase() + '.');
+    toast(wasEditMid ? cfg.midFileLabel + ' updated.' : 'Marked as ' + cfg.midStatusLabel.toLowerCase() + '.');
   } finally {
     saveBtn.disabled = false;
     saveBtn.textContent = originalLabel;
