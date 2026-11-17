@@ -379,6 +379,7 @@ async function load(quiet){
    jobs.push(sbq('req_documents?select=id,req_id,name,type,size&order=created_at.asc').then(a=>{docs=a||[]},e=>{docs=[]}));
    jobs.push(sbq('req_settings?select=*').then(a=>{settings=Object.fromEntries((a||[]).map(x=>[x.key,x.value]))},e=>{}));
   }
+  if(ME.role==='manager')jobs.push(empLoad().then(()=>{},e=>{em=[];warns.push('New employees could not be read: '+e.message)}));
   await Promise.all(jobs);
  };
  if(quiet)await go();else await busy(go);
@@ -386,20 +387,52 @@ async function load(quiet){
  render();
 }
 
+
+/* ---------- new employees (Payroll) - Manager only ---------- */
+let em=[];
+const EM_URL='https://axnxhqcvevviwnncplwt.supabase.co/functions/v1/emp-approvals';
+async function emCall(body){const r=await fetch(EM_URL,{method:'POST',headers:{'Content-Type':'application/json','x-nexus-token':TOKEN},body:JSON.stringify(body)});const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));return j}
+async function empLoad(){const j=await emCall({action:'list'});em=j.items||[]}
+const emD=v=>v&&/^\d{4}-\d\d-\d\d/.test(v)?String(v).slice(0,10).split('-').reverse().join('-'):(v||'-');
+const emMo=(v,u)=>'Rs '+(Number(v)||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})+(u?' '+u:'');
+function emCard(x){const mth=x.pay_type==='Monthly',u=mth?'per month':'per day',r=x.rate||{};
+ const sub=[x.contractor,x.designation,x.grp&&x.grp.trim(),'Joining '+emD(x.doj),'Prepared by '+(x.prepared_by_name||'-')].filter(Boolean).join(' · ');
+ return `<div class="ac rq"><div class="ach"><span class="tp">NEW EMPLOYEE</span><b class="no">${esc(x.emp_id)}</b><span class="age">waiting ${ageTxt(x.prepared_at)}</span></div>
+ <div class="acm">${esc(x.name)} &middot; ${mth?'Monthly salary':'Daily wage'} &middot; Basic ${emMo(r.basic,u)}</div><div class="acs">${esc(sub)}</div>
+ <div class="acf"><b class="amt">${emMo((+r.basic||0)+(+r.hra||0)+(+r.incentive||0),u)}</b><button class="btn sm dark" onclick="emView('${esc(x.emp_id)}')">&#128065; View</button><button class="btn sm ok" onclick="emApproveAsk('${esc(x.emp_id)}')">&#10003; Approve</button><button class="btn sm red" onclick="emRejectAsk('${esc(x.emp_id)}')">&#10005; Reject</button></div></div>`}
+const emBy=id=>em.find(x=>x.emp_id===id);
+function emView(id){const x=emBy(id);if(!x)return;const mth=x.pay_type==='Monthly',u=mth?'per month':'per day',r=x.rate||{};
+ const row=(a,b)=>`<tr><td style="padding:5px 8px;border:1px solid #ccd;width:42%">${a}</td><td style="padding:5px 8px;border:1px solid #ccd"><b>${b}</b></td></tr>`;
+ openModal(`<h3>${esc(x.emp_id)} &middot; ${esc(x.name)}</h3><table style="width:100%;border-collapse:collapse;font-size:13px">
+ ${row('Contractor',esc(x.contractor))}${row('Designation',esc(x.designation))}${row('Group',esc(x.grp&&x.grp.trim()))}${row('Gender / DOB',esc(x.gender)+' &middot; '+emD(x.dob))}${row('Date of joining',emD(x.doj))}${row('Mobile',esc(x.mobile))}
+ ${row('Pay type',mth?'MONTHLY SALARY':'DAILY WAGE')}${row('Weekly off paid',x.paid_weekly_off?'YES':'NO')}${row('Basic',emMo(r.basic,u))}${row('HRA',emMo(r.hra,u))}${row('Incentive',emMo(r.incentive,u))}${row('Sunday rate',emMo(r.sunday_rate))}
+ ${row('Total '+u,emMo((+r.basic||0)+(+r.hra||0)+(+r.incentive||0)))}${row('Prepared by',esc(x.prepared_by_name||'-')+' &middot; '+emD(x.prepared_at))}</table>
+ <div class="acts"><button class="btn dark" onclick="closeModal()">Close</button><button class="btn red" onclick="emRejectAsk('${esc(id)}')">Reject</button><button class="btn ok" onclick="emApproveAsk('${esc(id)}')">Approve</button></div>`)}
+function emApproveAsk(id){const x=emBy(id);if(!x)return;
+ openModal(`<h3>Approve ${esc(x.emp_id)} &middot; ${esc(x.name)}</h3><div style="font-size:13px">After approval the employee is added to payroll and attendance.</div><label>Comment (optional)</label><textarea id="emc" placeholder="Any note for HR"></textarea>
+ <div class="acts"><button class="btn dark" onclick="closeModal()">Cancel</button><button class="btn ok" onclick="emDecide('${esc(id)}','approve')">Approve</button></div>`)}
+function emRejectAsk(id){const x=emBy(id);if(!x)return;
+ openModal(`<h3>Reject ${esc(x.emp_id)} &middot; ${esc(x.name)}</h3><label>Reason *</label><textarea id="emc" placeholder="Why is it rejected?"></textarea>
+ <div class="acts"><button class="btn dark" onclick="closeModal()">Cancel</button><button class="btn red" onclick="emDecide('${esc(id)}','reject')">Reject</button></div>`)}
+async function emDecide(id,act){const c=($('#emc').value||'').trim();if(act==='reject'&&!c){toast('Enter a reason');return}
+ try{await busy(()=>emCall({action:act,emp_id:id,comment:c}));toast(act==='approve'?'Approved':'Rejected');closeModal()}catch(e){toast(String(e.message).slice(0,110));closeModal()}
+ await load(true)}
+
 /* ---------- render ---------- */
 const rqAmt=()=>rq.reduce((s,r)=>s+Number(r.amount||0),0),wcAmt=()=>wc.reduce((s,t)=>s+Number(t.quoted_amount||0),0);
 function render(){
- const n=wc.length+rq.length;
+ const emP=em.filter(x=>x.status==='PENDING');const n=wc.length+rq.length+emP.length;
  document.title=(n?'('+n+') ':'')+'CP Approvals';
  const tile=(k,c,l,a)=>`<button class="tile${filter===k?' on':''}" onclick="filter='${k}';render()"><b>${c}</b><span>${l}</span><em>${inr(a)}</em></button>`;
- $('#tiles').innerHTML=tile('ALL',n,'All pending',wcAmt()+rqAmt())+tile('WC',wc.length,'Work Cards',wcAmt())+tile('RQ',rq.length,'Requisitions',rqAmt());
+ $('#tiles').innerHTML=tile('WC',wc.length,'Work Cards',wcAmt())+tile('RQ',rq.length,'Requisitions',rqAmt())+(ME&&ME.role==='manager'?`<button class="tile${filter==='EM'?' on':''}" onclick="filter='EM';render()"><b>${emP.length}</b><span>New Employees</span><em>&nbsp;</em></button>`:'')+tile('ALL',n,'All pending',wcAmt()+rqAmt());
  const s=q.trim().toLowerCase();
  let items=[];
- if(filter!=='RQ')wc.forEach(t=>items.push({k:'WC',id:t.id,ts:t.raised_at,t}));
- if(filter!=='WC')rq.forEach(r=>items.push({k:'RQ',id:r.id,ts:new Date(r.raised_at||r.created_at).getTime(),t:r}));
+ if(filter!=='RQ'&&filter!=='EM')wc.forEach(t=>items.push({k:'WC',id:t.id,ts:t.raised_at,t}));
+ if(filter!=='WC'&&filter!=='EM')rq.forEach(r=>items.push({k:'RQ',id:r.id,ts:new Date(r.raised_at||r.created_at).getTime(),t:r}));
+ if(ME&&ME.role==='manager'&&(filter==='ALL'||filter==='EM'))emP.forEach(x=>items.push({k:'EM',id:x.emp_id,ts:new Date(x.prepared_at||0).getTime(),t:x}));
  if(s)items=items.filter(i=>JSON.stringify(i.t).toLowerCase().includes(s));
- items.sort((a,b)=>a.ts-b.ts);
- $('#list').innerHTML=items.length?items.map(i=>i.k==='WC'?wcCard(i.t):rqCard(i.t)).join(''):`<div class="empty"><big>&#9989;</big>${n?'Nothing matches your search.':'Nothing is waiting for your approval.'}</div>`;
+ const gr={WC:0,RQ:1,EM:2};items.sort((a,b)=>gr[a.k]-gr[b.k]||a.ts-b.ts);
+ $('#list').innerHTML=items.length?items.map(i=>i.k==='WC'?wcCard(i.t):i.k==='EM'?emCard(i.t):rqCard(i.t)).join(''):`<div class="empty"><big>&#9989;</big>${n?'Nothing matches your search.':'Nothing is waiting for your approval.'}</div>`;
 }
 function wcCard(t){
  const l2=Number(t.lvl||1)===2;
