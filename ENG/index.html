@@ -892,7 +892,7 @@ function navItems(){
   const mine=['mine','My Tickets',myConf];
   if(u.role==='manager')return [['approvals','Approval Queue',vis().filter(t=>t.status==='raised'&&!t.mgrOk).length],['all','All Tickets'],['raise','Raise Ticket'],mine,['log','Log'],['dash','Dashboard'],['opts','Manage Options']];
   if(u.role==='ceo')return [['approvals','Approval Queue',vis().filter(t=>t.status==='raised'&&(t.lvl||1)===2&&!t.ceoOk).length],['all','All Tickets'],['raise','Raise Ticket'],mine,['log','Log'],['dash','Dashboard']];
-  if(u.role==='engineering')return [...(cnt('approved')?[['lobby','Lobby',cnt('approved')]]:[]),['progress','Assigned / In Progress',cnt('running')],['log','Log'],['dash','Dashboard']];
+  if(u.role==='engineering')return [...(cnt('approved')?[['lobby','Lobby',cnt('approved')]]:[]),['raise','Raise Ticket'],['progress','Assigned / In Progress',cnt('running')],mine,['log','Log'],['dash','Dashboard']];
   return [['raise','Raise Ticket'],mine,['log','Log']];
 }
 const TITLES={approvals:['Approval Queue','Approve, deny or retrieve tickets.'],all:['All Tickets','Every ticket at every stage.'],raise:['Raise Ticket','Fill each step — the next one appears as you go.'],mine:['My Tickets','Tickets you raised and their live status.'],lobby:['Lobby','Approved tickets waiting for an engineer.'],progress:['In Progress','Running repairs — close each one with a full report.'],log:['Log','All tickets, filter by status (read-only).'],dash:['Dashboard','Status, response times and repeat issues.'],opts:['Manage Options','Dropdown values and the Operation → Machine map.'],pw:['Passwords','View and change the login password of each team (same for every unit).']};
@@ -971,7 +971,7 @@ function fill(sel,arr,cur,ph,extra){
 function populate(){
   const d=S.draft,co=d.company;
   const cs=$('f-company');cs.innerHTML=COMPANIES.map(c=>`<option value="${c.code}"${c.code===co?' selected':''}>${esc(c.name)}</option>`).join('');
-  cs.disabled=!isMgr()||!!d.editId;
+  cs.disabled=!(isMgr()||S.user.role==='engineering')||!!d.editId;
   fill($('f-dept'),API.options(co,'dept'),d.dept,'Select department…');
   fill($('f-nature'),API.options(co,'nature'),d.nature,'Select work nature…');
   fill($('f-process'),API.options(co,'process'),d.process,'Select process…');
