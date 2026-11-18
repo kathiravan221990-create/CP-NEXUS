@@ -964,7 +964,7 @@ function decodeEmbeddedHtml(b64){
   (function takeGatewayPass(){
     try {
       const m = /[#&]gw=([^&]+)/.exec(location.hash || '');
-      if(m){ localStorage.setItem(TOKEN_KEY, decodeURIComponent(m[1])); try { sessionStorage.setItem('nx_via_gw','1'); } catch(e2){} history.replaceState(null, '', location.pathname + location.search); }
+      if(m){ localStorage.setItem(TOKEN_KEY, decodeURIComponent(m[1])); try { sessionStorage.setItem('nx_via_gw','1'); } catch(e2){} try { const o = /[#&]open=([^&]+)/.exec(location.hash || ''); window.__gwOpen = o ? decodeURIComponent(o[1]) : null; } catch(e3){} history.replaceState(null, '', location.pathname + location.search); }
     } catch(e){}
   })();
   let sessionTimer = null;
@@ -1477,6 +1477,7 @@ function decodeEmbeddedHtml(b64){
     document.getElementById('homeUserDept').textContent = currentUser.dept ? currentUser.dept.name : '';
     buildTiles();
     show('home');
+    if(window.__gwOpen){ const wanted = window.__gwOpen; window.__gwOpen = null; setTimeout(function(){ const pp = NEXUS_CONFIG.portals.filter(function(x){ return x.id === wanted; })[0]; if(pp && pp._active !== false) openPortal(pp); }, 60); }
     refreshPortalsFromApi().then(function(ok){ if(ok) buildTiles(); }); // pick up the latest shared tile settings
     if(sessionTimer){ clearInterval(sessionTimer); sessionTimer = null; }
     if(getToken()){
@@ -2311,8 +2312,8 @@ function decodeEmbeddedHtml(b64){
   })();
 
 })();
-document.body.insertAdjacentHTML('beforeend','<div style="position:fixed;right:8px;bottom:6px;font:11px sans-serif;color:#fff;opacity:.55;z-index:99999;pointer-events:none">NEXUS v18-Nov-1450</div>');
+document.body.insertAdjacentHTML('beforeend','<div style="position:fixed;right:8px;bottom:6px;font:11px sans-serif;color:#fff;opacity:.55;z-index:99999;pointer-events:none">NEXUS v18-Nov-1520</div>');
 </script>
-<script>(function(){try{var S='v18-Nov-1450',k='cp_fresh_'+location.pathname;fetch(location.pathname+'?_='+Date.now(),{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/v18-Nov-\d+|v\d+-[A-Za-z]{3}-\d+/);if(m&&m[0]!==S&&sessionStorage.getItem(k)!==m[0]){sessionStorage.setItem(k,m[0]);location.reload()}}).catch(function(){})}catch(e){}})();</script>
+<script>(function(){try{var S='v18-Nov-1520',k='cp_fresh_'+location.pathname;fetch(location.pathname+'?_='+Date.now(),{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/v18-Nov-\d+|v\d+-[A-Za-z]{3}-\d+/);if(m&&m[0]!==S&&sessionStorage.getItem(k)!==m[0]){sessionStorage.setItem(k,m[0]);location.reload()}}).catch(function(){})}catch(e){}})();</script>
 </body>
 </html>
