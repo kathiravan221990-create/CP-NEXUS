@@ -281,6 +281,20 @@ body{background:radial-gradient(120% 80% at 50% -10%,#0f3566 0%,#061a3a 55%,#030
 .acf .amt{font-weight:300;font-size:22px;color:#fff}
 .btn.ok{background:linear-gradient(180deg,#f3d98d,#cfa443);color:#1b1404}
 .srch{border-radius:12px}
+
+/* darker, no gold circles */
+body::before{display:none!important}
+body{background:radial-gradient(120% 80% at 50% -10%,#0a2347 0%,#041126 55%,#020812 100%)!important}
+.ac{background:linear-gradient(180deg,rgba(9,34,70,.92),rgba(4,18,42,.95))!important}
+.fb{background:rgba(24,62,108,.8)!important}
+.fb.on{background:linear-gradient(180deg,#ffe9a8,#f0c04e)!important;color:#241800!important}
+
+.fb{display:flex;align-items:center;justify-content:center;gap:9px}
+.fi{width:24px;height:24px;flex:none;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35))}
+.fb.on .fi{filter:none}
+.fb.on .fi *{stroke:#3a2500}
+
+.fe{font-style:normal;font-size:24px;line-height:1;font-family:"Noto Color Emoji","Apple Color Emoji","Segoe UI Emoji",sans-serif}
 </style><script>try{if(window.parent!==window)document.documentElement.classList.add('in-nexus')}catch(e){document.documentElement.classList.add('in-nexus')}</script>
 </head>
 <body>
@@ -453,7 +467,8 @@ const rqAmt=()=>rq.reduce((s,r)=>s+Number(r.amount||0),0),wcAmt=()=>wc.reduce((s
 function render(){
  const emP=em.filter(x=>x.status==='PENDING');const n=wc.length+rq.length+emP.length;
  document.title=(n?'('+n+') ':'')+'CP Approvals';
- const fb=(k,c,l)=>`<button class="fb${filter===k?' on':''}" onclick="filter='${k}';render()">${l}<b>${c}</b></button>`;
+ const IC={ALL:'&#128203;',WC:'&#128295;',RQ:'&#128722;',EM:'&#128119;'};
+ const fb=(k,c,l)=>`<button class="fb${filter===k?' on':''}" onclick="filter='${k}';render()"><i class="fe">${IC[k]}</i><span>${l}</span><b>${c}</b></button>`;
  $('#tiles').innerHTML=`<div class="fbs">${fb('ALL',n,'All')}${fb('WC',wc.length,'Work Card')}${fb('RQ',rq.length,'Requisition')}${ME&&ME.role==='manager'?fb('EM',emP.length,'New Employee'):''}</div>`;
  const s=q.trim().toLowerCase();
  let items=[];
