@@ -1594,15 +1594,14 @@ const btnIpSec = document.getElementById('btnIpSec');
   async function ipAdd(ip,label,temp){
     var res=[];
     if(me&&me.nx){
-      var row={ip_address:ip,type:temp?'temporary':'default',label:label||null}; if(temp) row.expires_at=new Date(Date.now()+6*3600*1000).toISOString();
-      var a=await jf(NX_URL+'/rest/v1/allowed_ips',{method:'POST',headers:Object.assign(NX_H(),{Prefer:'return=minimal'}),body:JSON.stringify(row)});
-      res.push(a.ok?null:'NEXUS: could not add'); }
+      var a=await jf(NX_URL+'/rest/v1/rpc/nexus_ip_add',{method:'POST',headers:NX_H(),body:JSON.stringify({p_token:getToken(),p_ip:ip,p_type:temp?'temporary':'default',p_label:label||''})});
+      res.push(a.ok&&a.json&&a.json.ok?null:'NEXUS: could not add'+(a.json&&a.json.error==='not_allowed'?' (not allowed for your role)':'')); }
     if(me&&me.ws){ var r=await wsRpc('allowed_ip_save',{p_id:null,p_cidr:ip+'/32',p_label:label||(temp?'Temporary':'Default'),p_active:true,p_temp:!!temp}); res.push(r.ok?null:'WORKSPACE: '+r.err); }
     return res.filter(Boolean);
   }
   async function ipRemove(row){
     var res=[];
-    if(row.nx!=null){ var a=await jf(NX_URL+'/rest/v1/allowed_ips?id=eq.'+encodeURIComponent(row.nx),{method:'DELETE',headers:NX_H()}); if(!a.ok) res.push('NEXUS: could not remove'); }
+    if(row.nx!=null){ var a=await jf(NX_URL+'/rest/v1/rpc/nexus_ip_delete',{method:'POST',headers:NX_H(),body:JSON.stringify({p_token:getToken(),p_id:row.nx})}); if(!(a.ok&&a.json&&a.json.ok)) res.push('NEXUS: could not remove'); }
     if(row.ws!=null){ var r=await wsRpc('allowed_ip_delete',{p_id:row.ws}); if(!r.ok) res.push('WORKSPACE: '+r.err); }
     return res;
   }
@@ -1720,8 +1719,8 @@ $("bellAll").onclick=function(){ if(!(me&&me.nx))return; jf(NX_URL+"/rest/v1/rpc
 waterStart();
 document.addEventListener("click",function(e){ if(!$("login").hidden&&getComputedStyle($("login")).display!=="none") waterDrop(e.clientX,e.clientY,true); });
 gwRestore();
-document.body.insertAdjacentHTML('beforeend','<div style="position:fixed;right:8px;bottom:6px;font:11px sans-serif;color:#fff;opacity:.55;z-index:99999;pointer-events:none">Gateway v18-Nov-1945</div>');
+document.body.insertAdjacentHTML('beforeend','<div style="position:fixed;right:8px;bottom:6px;font:11px sans-serif;color:#fff;opacity:.55;z-index:99999;pointer-events:none">Gateway v18-Nov-1958</div>');
 </script>
-<script>(function(){try{var S='v18-Nov-1945',k='cp_fresh_'+location.pathname;fetch(location.pathname+'?_='+Date.now(),{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/v18-Nov-\d+|v\d+-[A-Za-z]{3}-\d+/);if(m&&m[0]!==S&&sessionStorage.getItem(k)!==m[0]){sessionStorage.setItem(k,m[0]);location.reload()}}).catch(function(){})}catch(e){}})();</script>
+<script>(function(){try{var S='v18-Nov-1958',k='cp_fresh_'+location.pathname;fetch(location.pathname+'?_='+Date.now(),{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/v18-Nov-\d+|v\d+-[A-Za-z]{3}-\d+/);if(m&&m[0]!==S&&sessionStorage.getItem(k)!==m[0]){sessionStorage.setItem(k,m[0]);location.reload()}}).catch(function(){})}catch(e){}})();</script>
 </body>
 </html>
