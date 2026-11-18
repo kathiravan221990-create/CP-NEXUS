@@ -298,6 +298,28 @@ canvas{width:100%;height:160px;background:#fff;border:2px dashed #9a7209;border-
 @media(max-width:600px){.row2{grid-template-columns:1fr}.kv{grid-template-columns:110px 1fr}}
 /* keep the top-right corner free for the Nexus Home button */
 html.in-nexus .top,html.in-nexus header,html.in-nexus .topbar{padding-right:56px !important}
+
+/* ===== elite navy and gold ===== */
+:root{--navy:#061a3a;--navy2:#03112a;--gold:#cfa443;--gold2:#f3d98d}
+body{background:radial-gradient(120% 80% at 60% -10%,#0f3566 0%,#061a3a 55%,#030d22 100%)}
+#side{background:linear-gradient(180deg,#030d22,#061a3a);border-right:1px solid rgba(243,217,141,.45)}
+.sbtop b{font-family:Georgia,"Times New Roman",serif;letter-spacing:.26em;font-weight:400}
+.nvh{letter-spacing:.28em;color:#b9a56b}
+.nv{border-radius:10px;color:#d7e3f0}
+.nv.on{background:linear-gradient(90deg,rgba(243,217,141,.22),rgba(243,217,141,.04));color:var(--gold2)}
+header.topbar,header{background:rgba(3,13,34,.94);border-bottom:1px solid rgba(243,217,141,.5)}
+header h2{font-family:Georgia,"Times New Roman",serif;letter-spacing:.24em;font-weight:400}
+.stats{gap:10px}
+.stat{background:linear-gradient(180deg,rgba(14,48,92,.85),rgba(7,28,62,.9));border:1px solid rgba(243,217,141,.35);border-radius:14px;box-shadow:0 8px 22px rgba(0,0,0,.28)}
+.stat:hover,.stat.on{background:linear-gradient(180deg,rgba(243,217,141,.22),rgba(14,48,92,.9));border-color:var(--gold2)}
+.stat b{font-weight:300;font-size:30px;color:var(--gold2);font-variant-numeric:lining-nums tabular-nums}
+.stat span{letter-spacing:.14em;text-transform:uppercase;font-size:10.5px;opacity:.8}
+table{border-collapse:separate;border-spacing:0}
+th{background:linear-gradient(180deg,#0f3566,#0a2548);color:var(--gold2);letter-spacing:.1em;text-transform:uppercase;font-size:10.5px;padding:9px 6px;border-bottom:1px solid rgba(243,217,141,.55)}
+td{background:rgba(10,34,64,.55);border-bottom:1px solid rgba(243,217,141,.12);padding:7px 6px}
+tr:hover td{background:rgba(243,217,141,.1)}
+.badge{background:linear-gradient(180deg,#f3d98d,#cfa443)}
+.btn{background:linear-gradient(180deg,#f3d98d,#cfa443);color:#1b1404;border-radius:10px}
 </style>
 <script>try{if(window.parent!==window)document.documentElement.classList.add('in-nexus')}catch(e){document.documentElement.classList.add('in-nexus')}</script>
 </head>
