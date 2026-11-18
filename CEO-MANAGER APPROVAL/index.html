@@ -251,6 +251,36 @@ canvas{width:100%;height:160px;background:#fff;border:2px dashed #9a7209;border-
 @media(max-width:560px){.top{gap:6px;padding:8px 10px}.top h1 small{display:none}.top .btn{padding:6px 9px;font-size:12px}.hico{width:38px;height:38px}.tiles{gap:6px}.tile{padding:8px}.tile b{font-size:22px}.top h1{font-size:14px}.wrap{padding:10px}.acf .btn{flex:1}.acf .amt{flex-basis:100%}}
 /* keep the top-right corner free for the Nexus Home button */
 html.in-nexus .top,html.in-nexus header,html.in-nexus .topbar{padding-right:56px !important}
+
+/* ===== elite navy and gold ===== */
+:root{--navy:#061a3a;--navy2:#03112a;--gold:#cfa443;--gold2:#f3d98d}
+body{background:radial-gradient(120% 80% at 50% -10%,#0f3566 0%,#061a3a 55%,#030d22 100%)}
+.top{background:rgba(3,13,34,.96);border-bottom:1px solid rgba(243,217,141,.55)}
+.top h1{font-family:Georgia,"Times New Roman",serif;letter-spacing:.28em;font-weight:400;color:var(--gold2)}
+.top h1 small{letter-spacing:.3em;opacity:.65}
+.tiles{display:block}
+.kp{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px}
+.kp div{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-radius:9px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.kp small{font-size:10px;letter-spacing:.1em;font-weight:700;text-transform:uppercase}
+.kp b{font-size:19px;font-weight:600}
+.kp .am{background:linear-gradient(180deg,#fff0c2,#ffdf8a);color:#5a3b00}
+.kp .gr{background:linear-gradient(180deg,#d4f8e4,#9be8bf);color:#0b4a2a}
+.kp .rd{background:linear-gradient(180deg,#ffdcda,#ffb0ac);color:#7a1411}
+.fbs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.fb{padding:13px 10px;font:600 15px/1.2 inherit;font-family:inherit;color:#fff;background:rgba(40,86,140,.75);border:1.5px solid rgba(243,217,141,.8);border-radius:14px;cursor:pointer}
+.fb b{margin-left:7px;color:var(--gold2)}
+.fb.on{background:linear-gradient(180deg,#ffe9a8,#f0c04e);color:#241800;border-color:transparent}
+.fb.on b{color:#241800}
+.ac{background:linear-gradient(180deg,rgba(14,48,92,.85),rgba(7,28,62,.9));border:1px solid rgba(243,217,141,.35);border-left:3px solid var(--gold);border-radius:16px;padding:14px 16px;box-shadow:0 8px 22px rgba(0,0,0,.3)}
+.ac.wc{border-left-color:#5aa9ff}
+.tp{background:transparent;border:1px solid var(--gold);color:var(--gold2);letter-spacing:.14em}
+.tp.wc{background:transparent;border-color:#5aa9ff;color:#8cc4ff}
+.no{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--gold2);letter-spacing:.04em}
+.acm{font-size:16px;font-weight:600}
+.acf{border-top:1px solid rgba(243,217,141,.2);padding-top:10px}
+.acf .amt{font-weight:300;font-size:22px;color:#fff}
+.btn.ok{background:linear-gradient(180deg,#f3d98d,#cfa443);color:#1b1404}
+.srch{border-radius:12px}
 </style><script>try{if(window.parent!==window)document.documentElement.classList.add('in-nexus')}catch(e){document.documentElement.classList.add('in-nexus')}</script>
 </head>
 <body>
@@ -379,6 +409,9 @@ async function load(quiet){
    jobs.push(sbq('req_documents?select=id,req_id,name,type,size&order=created_at.asc').then(a=>{docs=a||[]},e=>{docs=[]}));
    jobs.push(sbq('req_settings?select=*').then(a=>{settings=Object.fromEntries((a||[]).map(x=>[x.key,x.value]))},e=>{}));
   }
+  {const d0=new Date();d0.setHours(0,0,0,0);const t0=encodeURIComponent(d0.toISOString());
+   jobs.push(sbw('ewc_tickets?updated_at=gte.'+t0+'&status=in.(running,denied,closed,done,completed)&select=status').then(a=>{window._wcDay=a||[]},e=>{window._wcDay=[]}));
+   jobs.push(sbq('req_requisitions?or=(approved_at.gte.'+t0+',ceo_at.gte.'+t0+')&status=eq.Approved&select=id').then(a=>{window._rqOk=(a||[]).length},e=>{window._rqOk=0}));}
   if(ME.role==='manager')jobs.push(empLoad().then(()=>{},e=>{em=[];warns.push('New employees could not be read: '+e.message)}));
   await Promise.all(jobs);
  };
@@ -389,7 +422,7 @@ async function load(quiet){
 
 
 /* ---------- new employees (Payroll) - Manager only ---------- */
-let em=[];
+let em=[];let dayOk=0,dayNo=0;
 const EM_URL='https://axnxhqcvevviwnncplwt.supabase.co/functions/v1/emp-approvals';
 async function emCall(body){const r=await fetch(EM_URL,{method:'POST',headers:{'Content-Type':'application/json','x-nexus-token':TOKEN},body:JSON.stringify(body)});const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));return j}
 async function empLoad(){const j=await emCall({action:'list'});em=j.items||[]}
@@ -423,8 +456,9 @@ const rqAmt=()=>rq.reduce((s,r)=>s+Number(r.amount||0),0),wcAmt=()=>wc.reduce((s
 function render(){
  const emP=em.filter(x=>x.status==='PENDING');const n=wc.length+rq.length+emP.length;
  document.title=(n?'('+n+') ':'')+'CP Approvals';
- const tile=(k,c,l,a)=>`<button class="tile${filter===k?' on':''}" onclick="filter='${k}';render()"><b>${c}</b><span>${l}</span><em>${inr(a)}</em></button>`;
- $('#tiles').innerHTML=tile('WC',wc.length,'Work Cards',wcAmt())+tile('RQ',rq.length,'Requisitions',rqAmt())+(ME&&ME.role==='manager'?`<button class="tile${filter==='EM'?' on':''}" onclick="filter='EM';render()"><b>${emP.length}</b><span>New Employees</span><em>&nbsp;</em></button>`:'')+tile('ALL',n,'All pending',wcAmt()+rqAmt());
+ const wd=window._wcDay||[];dayOk=wd.filter(x=>x.status!=='denied').length+(window._rqOk||0);dayNo=wd.filter(x=>x.status==='denied').length;
+ const fb=(k,c,l)=>`<button class="fb${filter===k?' on':''}" onclick="filter='${k}';render()">${l}<b>${c}</b></button>`;
+ $('#tiles').innerHTML=`<div class="kp"><div class="am"><small>Waiting</small><b>${n}</b></div><div class="gr"><small>Approved</small><b>${dayOk}</b></div><div class="rd"><small>Rejected</small><b>${dayNo}</b></div></div><div class="fbs">${fb('ALL',n,'All')}${fb('WC',wc.length,'Work Card')}${fb('RQ',rq.length,'Requisition')}${ME&&ME.role==='manager'?fb('EM',emP.length,'New Employee'):''}</div>`;
  const s=q.trim().toLowerCase();
  let items=[];
  if(filter!=='RQ'&&filter!=='EM')wc.forEach(t=>items.push({k:'WC',id:t.id,ts:t.raised_at,t}));
