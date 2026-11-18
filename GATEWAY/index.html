@@ -732,14 +732,25 @@ var NEXUS_CONFIG={portals:[],departments:[]};
   }
   /* ---- CP WORKSPACE side: the same person is kept in both systems ---- */
   const WS_CODE_FOR_NX = {}; Object.keys(DEPT_TO_NX).forEach(function(k){ WS_CODE_FOR_NX[DEPT_TO_NX[k]] = k; });
+  /* the CP WORKSPACE sign-in lasts about an hour: renew it quietly with the saved refresh key, then try again once */
+  async function wsRenew(){
+    if(!(me && me.ws && me.ws.rtok)) return false;
+    const a = await jf(WS_URL + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: { apikey: WS_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: me.ws.rtok }) });
+    if(!a.ok || !a.json || !a.json.access_token) return false;
+    me.ws.tok = a.json.access_token; me.ws.rtok = a.json.refresh_token || me.ws.rtok; try{ gwSave(); }catch(e){}
+    return true;
+  }
+  function wsExpired(r){ return r.status === 401 || /jwt|expired/i.test(JSON.stringify(r.json || '')); }
   async function wsApi(fn, args){
     if(!(me && me.ws && me.ws.tok)) return { ok: false, error: 'no_ws' };
-    const r = await jf(WS_URL + '/rest/v1/rpc/' + fn, { method: 'POST', headers: WS_H(me.ws.tok), body: JSON.stringify(args || {}) });
+    const go1 = function(){ return jf(WS_URL + '/rest/v1/rpc/' + fn, { method: 'POST', headers: WS_H(me.ws.tok), body: JSON.stringify(args || {}) }); };
+    let r = await go1(); if(!r.ok && wsExpired(r) && await wsRenew()) r = await go1();
     return { ok: r.ok, json: r.json, error: r.ok ? null : ((r.json && (r.json.message || r.json.error)) || ('HTTP ' + r.status)) };
   }
   async function wsFn(body){
     if(!(me && me.ws && me.ws.tok)) return { ok: false, error: 'no_ws' };
-    const r = await jf(WS_URL + '/functions/v1/create-user', { method: 'POST', headers: { apikey: WS_KEY, Authorization: 'Bearer ' + me.ws.tok, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const go2 = function(){ return jf(WS_URL + '/functions/v1/create-user', { method: 'POST', headers: { apikey: WS_KEY, Authorization: 'Bearer ' + me.ws.tok, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); };
+    let r = await go2(); if(!r.ok && wsExpired(r) && await wsRenew()) r = await go2();
     const ok = r.ok && r.json && !r.json.error;
     return { ok: ok, json: r.json, error: ok ? null : ((r.json && (r.json.error || r.json.message)) || ('HTTP ' + r.status)) };
   }
@@ -856,7 +867,7 @@ var NEXUS_CONFIG={portals:[],departments:[]};
 
     function drawTabs(){
       tabs.textContent = '';
-      [['people', '👤 People (' + users.length + ')'], ['roles', '🛡️ Departments (' + roles.length + ')'], ['access', '🔑 Who can open what'], ['mode', '⚙️ Access mode'], ['tools', '🧰 Tools']].forEach(function(t){
+      [['people', '👤 People (' + users.length + ')'], ['roles', '🛡️ Departments (' + roles.length + ')'], ['access', '🧩 Tiles'], ['mode', '⚙️ Access mode'], ['tools', '🧰 Tools']].forEach(function(t){
         const b = mk('button', 'nxu-tab' + (tab === t[0] ? ' on' : ''), t[1]); b.type = 'button'; b.addEventListener('click', function(){ go(t[0]); }); tabs.appendChild(b);
       });
     }
@@ -1071,7 +1082,132 @@ var NEXUS_CONFIG={portals:[],departments:[]};
       });
     }
 
-    // ================= WHO CAN OPEN WHAT =================
+
+    // ================= TILES (who sees which tile, saved to both systems) =================
+    function tilesStyle(){
+      if(document.getElementById('nxu-tiles-style')) return;
+      const st = document.createElement('style'); st.id = 'nxu-tiles-style';
+      st.textContent = [
+        '.tg-card{background:rgba(16,39,67,.85);border:1px solid #2a4566;border-radius:18px;overflow:auto;box-shadow:0 14px 40px rgba(0,0,0,.35)}',
+        '.tg-card table{border-collapse:collapse;width:100%;min-width:900px}',
+        '.tg-g{padding:11px 8px;font-size:12px;letter-spacing:.14em;font-weight:800;text-transform:uppercase;text-align:center}',
+        '.tg-gws{background:linear-gradient(90deg,#4a3a10,#2b2410);color:#ffe08c;border-left:3px solid #e8bf5e}',
+        '.tg-gnx{background:linear-gradient(90deg,#10355c,#0d2744);color:#9ccbff;border-left:3px solid #6fb0ff}',
+        '.tg-t{padding:10px 4px 9px;text-align:center;min-width:84px;background:#0e2548;border-bottom:1px solid #2a4566}',
+        '.tg-t .ic{font-size:22px;line-height:1}.tg-t .tn{font-size:10px;font-weight:800;letter-spacing:.04em;color:#e8bf5e;margin-top:5px;line-height:1.2}.tg-t.n .tn{color:#9ccbff}',
+        '.tg-dh{background:#0e2548;text-align:left;padding:0 0 12px 20px;color:#e8bf5e;font-size:12px;letter-spacing:.12em;text-transform:uppercase;min-width:250px;vertical-align:bottom}',
+        '.tg-card td{text-align:center;padding:9px 4px;border-bottom:1px solid #1d3a5c}.tg-card tbody tr:last-child td{border-bottom:0}.tg-card tbody tr:hover td{background:rgba(232,191,94,.05)}',
+        '.tg-card td.g1{border-left:3px solid rgba(232,191,94,.55)}.tg-card td.g2{border-left:3px solid rgba(111,176,255,.55)}',
+        '.tg-card td.dep{text-align:left;padding:9px 14px 9px 20px}.tg-dep{display:flex;align-items:center;gap:12px}',
+        '.tg-di{width:38px;height:38px;border-radius:12px;background:#143a63;display:flex;align-items:center;justify-content:center;font-size:20px;flex:none;border:1px solid #2f5a8a}',
+        '.tg-dep b{font-size:15px;color:#fff}.tg-dep>div{flex:1}.tg-cnt{font-size:19px;font-weight:800;color:#e8bf5e}.tg-cnt small{font-size:11px;color:#8aa3bd;font-weight:600}',
+        '.tg-bar{height:4px;background:#1a3556;border-radius:4px;margin-top:6px;width:140px;overflow:hidden}.tg-bar u{display:block;height:100%;background:linear-gradient(90deg,#e8bf5e,#ffe9ad);border-radius:4px}',
+        '.tg-tag{display:inline-block;margin-left:8px;font-size:9.5px;font-weight:800;letter-spacing:.08em;padding:2px 7px;border-radius:5px;background:rgba(95,174,82,.2);color:#9fe48b;border:1px solid rgba(95,174,82,.5);vertical-align:2px}',
+        '.tg-sw{display:inline-flex;width:30px;height:30px;border-radius:9px;border:1.5px solid #3b5a7e;background:#0c2038;align-items:center;justify-content:center;cursor:pointer;color:transparent;font-weight:900;font-size:16px;user-select:none;transition:transform .08s}',
+        '.tg-sw:hover{transform:scale(1.08)}.tg-sw.on{background:linear-gradient(180deg,#ffe9ad,#d9a637);border-color:#ffe9ad;color:#2a1d00;box-shadow:0 3px 10px rgba(217,166,55,.35)}',
+        '.tg-sw.lk{background:linear-gradient(180deg,#5aa845,#3b7a2a);border-color:#8fd47a;color:#eaffdf;cursor:not-allowed}.tg-sw.na{opacity:.25;cursor:not-allowed}',
+        '.tg-legend{display:flex;gap:22px;align-items:center;flex-wrap:wrap;font-size:12.5px;opacity:.92;margin:0 0 12px}.tg-legend .tg-sw{width:22px;height:22px;font-size:12px;margin-right:6px;cursor:default;vertical-align:middle}',
+        '.tg-foot{display:flex;align-items:center;gap:14px;margin-top:16px;flex-wrap:wrap}'
+      ].join('\n');
+      document.head.appendChild(st);
+    }
+    const TG_DEP_IC = { administrator: '👑', manager: '🧭', ceo: '🎖️', hr_admin: '👥', production: '🏭', scm: '📦', engineering: '🔧', maintenance: '🛠️', security: '💂', quality: '✅' };
+    const TG_TILE_IC = { pms: '🏭', payroll: '💰', quality: '✅', tincost: '🧮', pf_esi: '🛡️', cp_portal: '🌐', eng_worklog: '🛠️', requisition: '📝', approvals: '✔️', security_tracking: '🚧', ip_security: '🔒' };
+    function drawTiles(noteEl){
+      tilesStyle(); wrap.style.maxWidth = 'none';
+      wrap.appendChild(mk('p', 'nxu-hint', 'Tick a box to let that department see the tile. Gold = can open. Green = locked (always on). Saving updates CP WORKSPACE and CP NEXUS together; they only show the result.'));
+      if(!WS.canWrite) wrap.appendChild(mk('p', 'nxu-note err', 'CP WORKSPACE tiles are read-only here: sign in with a CP WORKSPACE administrator login to change them.'));
+      const holder = mk('div'); holder.textContent = 'Loading tiles…'; box.textContent = ''; if(noteEl) box.insertBefore(noteEl, box.firstChild); wrap.appendChild(box); wrap.appendChild(holder);
+      (async function(){
+        const nxr = await jf(NX_URL + '/rest/v1/nexus_portals?select=*&order=sort_order', { headers: { apikey: NX_KEY, Authorization: 'Bearer ' + NX_KEY } });
+        const wsr = WS.canWrite ? await wsApi('portal_links_list') : { ok: false, json: [] };
+        holder.textContent = '';
+        const nxTiles = (nxr.ok && Array.isArray(nxr.json) ? nxr.json : []).filter(function(r){ return r.active !== false && r.portal_id !== 'portal_links'; });
+        const wsTiles = (wsr.ok && Array.isArray(wsr.json) ? wsr.json : []).filter(function(r){ return r.active !== false; });
+        const deps = activeRoles;
+        // state: on[depRole][sys:tileId]
+        const state = {}; const orig = {};
+        function isLocked(sys, d){ return d.is_admin && sys === 'nx' || (sys === 'ws' && d.role_id === 'administrator'); }
+        deps.forEach(function(d){
+          state[d.role_id] = {};
+          nxTiles.forEach(function(t){ state[d.role_id]['nx:' + t.portal_id] = d.is_admin || (t.allowed_depts || []).indexOf(d.role_id) > -1; });
+          wsTiles.forEach(function(t){ state[d.role_id]['ws:' + t.code] = d.role_id === 'administrator' || (t.depts || []).indexOf(wsCodeFor(d.role_id)) > -1; });
+        });
+        JSON.parse(JSON.stringify(state), function(k, v){ return v; });
+        const snap = JSON.stringify(state);
+        const total = nxTiles.length + wsTiles.length;
+        const card = mk('div', 'tg-card'); const tbl = mk('table');
+        const thead = mk('thead'); const r1 = mk('tr'), r2 = mk('tr');
+        const dh = mk('th', 'tg-dh', 'Department'); dh.rowSpan = 2; r1.appendChild(dh);
+        if(wsTiles.length){ const g = mk('th', 'tg-g tg-gws', '🏢 CP WORKSPACE'); g.colSpan = wsTiles.length; r1.appendChild(g); }
+        if(nxTiles.length){ const g = mk('th', 'tg-g tg-gnx', '🔗 CP NEXUS'); g.colSpan = nxTiles.length; r1.appendChild(g); }
+        function th2(t, sys, id, title){ const h = mk('th', 'tg-t' + (sys === 'nx' ? ' n' : '')); h.appendChild(mk('div', 'ic', TG_TILE_IC[id] || '🧩')); h.appendChild(mk('div', 'tn', title)); r2.appendChild(h); }
+        wsTiles.forEach(function(t){ th2(t, 'ws', t.code, t.title); });
+        nxTiles.forEach(function(t){ th2(t, 'nx', t.portal_id, t.title); });
+        thead.appendChild(r1); thead.appendChild(r2); tbl.appendChild(thead);
+        const tb = mk('tbody'); tbl.appendChild(tb);
+        const cntEls = {}, barEls = {};
+        function recount(){ deps.forEach(function(d){ let n = 0; Object.keys(state[d.role_id]).forEach(function(k){ if(state[d.role_id][k]) n++; }); cntEls[d.role_id].firstChild.textContent = n; barEls[d.role_id].style.width = (total ? Math.round(n / total * 100) : 0) + '%'; }); }
+        deps.forEach(function(d){
+          const tr = mk('tr'); const td = mk('td', 'dep'); const dp = mk('div', 'tg-dep');
+          dp.appendChild(mk('div', 'tg-di', TG_DEP_IC[d.role_id] || '🏷️'));
+          const nm = mk('div'); const b = mk('b', '', d.name); nm.appendChild(b);
+          if(d.role_id === 'administrator') nm.appendChild(mk('span', 'tg-tag', 'DEFAULT · ALL TILES'));
+          const bar = mk('div', 'tg-bar'); const u = mk('u'); bar.appendChild(u); barEls[d.role_id] = u; nm.appendChild(bar); dp.appendChild(nm);
+          const cn = mk('div', 'tg-cnt'); cn.appendChild(document.createTextNode('0')); cn.appendChild(mk('small', '', '/' + total)); cntEls[d.role_id] = cn; dp.appendChild(cn);
+          td.appendChild(dp); tr.appendChild(td);
+          function cell(sys, id, first){
+            const c = mk('td', first ? (sys === 'ws' ? 'g1' : 'g2') : ''); const key = sys + ':' + id; const sw = mk('span', 'tg-sw', '✓');
+            const hasDept = sys === 'nx' || !!WS.deptId[wsCodeFor(d.role_id)];
+            const locked = isLocked(sys, d);
+            function paint(){ sw.className = 'tg-sw' + (state[d.role_id][key] ? (locked ? ' on lk' : ' on') : '') + ((!locked && (!hasDept || (sys === 'ws' && !WS.canWrite))) ? ' na' : ''); }
+            paint();
+            if(locked) sw.title = 'Always on for this department';
+            else if(!hasDept) sw.title = 'This department does not exist in CP WORKSPACE';
+            else if(sys === 'ws' && !WS.canWrite) sw.title = 'Sign in with a CP WORKSPACE administrator login to change';
+            else sw.addEventListener('click', function(){ state[d.role_id][key] = !state[d.role_id][key]; paint(); recount(); dirtyChk(); });
+            c.appendChild(sw); tr.appendChild(c);
+          }
+          wsTiles.forEach(function(t, i){ cell('ws', t.code, i === 0); });
+          nxTiles.forEach(function(t, i){ cell('nx', t.portal_id, i === 0); });
+          tb.appendChild(tr);
+        });
+        recount(); card.appendChild(tbl); holder.appendChild(card);
+        const foot = mk('div', 'tg-foot'); const save = mk('button', 'nxu-btn', '💾 Save tiles'); save.type = 'button'; save.disabled = true;
+        const undo = mk('button', 'nxu-btn ghost', '↺ Undo changes'); undo.type = 'button';
+        foot.appendChild(save); foot.appendChild(undo); foot.appendChild(mk('span', 'sub', 'Saving updates both systems at once. Only Administrator and Manager see this tab.')); holder.appendChild(foot);
+        function dirtyChk(){ save.disabled = JSON.stringify(state) === snap; }
+        undo.addEventListener('click', function(){ go('access'); });
+        save.addEventListener('click', async function(){
+          save.disabled = true; save.textContent = 'Saving…';
+          const problems = []; let changed = 0;
+          const before = JSON.parse(snap);
+          // CP NEXUS tiles
+          for(const t of nxTiles){
+            const key = 'nx:' + t.portal_id;
+            if(!deps.some(function(d){ return !isLocked('nx', d) && state[d.role_id][key] !== before[d.role_id][key]; })) continue;
+            const list = deps.filter(function(d){ return !d.is_admin && state[d.role_id][key]; }).map(function(d){ return d.role_id; });
+            (t.allowed_depts || []).forEach(function(x){ if(!deps.some(function(d){ return d.role_id === x; }) && list.indexOf(x) < 0) list.push(x); });
+            const r = await jf(NX_URL + '/rest/v1/nexus_portals?portal_id=eq.' + encodeURIComponent(t.portal_id), { method: 'PATCH', headers: { apikey: NX_KEY, Authorization: 'Bearer ' + NX_KEY, 'Content-Type': 'application/json', 'x-nexus-token': getToken() || '', Prefer: 'return=representation' }, body: JSON.stringify({ allowed_depts: list, updated_at: new Date().toISOString(), updated_by: (me && me.login) || 'gateway' }) });
+            if(!r.ok || !Array.isArray(r.json) || !r.json.length) problems.push('CP NEXUS ' + t.title); else changed++;
+          }
+          // CP WORKSPACE tiles
+          if(WS.canWrite) for(const t of wsTiles){
+            const key = 'ws:' + t.code;
+            if(!deps.some(function(d){ return !isLocked('ws', d) && state[d.role_id][key] !== before[d.role_id][key]; })) continue;
+            const list = deps.filter(function(d){ return state[d.role_id][key] && WS.deptId[wsCodeFor(d.role_id)]; }).map(function(d){ return wsCodeFor(d.role_id); });
+            if(list.indexOf('ADMIN') < 0) list.push('ADMIN');
+            (t.depts || []).forEach(function(x){ if(!deps.some(function(d){ return wsCodeFor(d.role_id) === x; }) && list.indexOf(x) < 0) list.push(x); });
+            const w = await wsApi('portal_link_save', { p_code: t.code, p_title: t.title, p_url: t.url, p_active: t.active !== false, p_depts: list });
+            if(!w.ok) problems.push('CP WORKSPACE ' + t.title + ' (' + wsText(w.error) + ')'); else changed++;
+          }
+          if(problems.length) { box.insertBefore(note('Saved ' + changed + ' tile(s). NOT saved: ' + problems.join(', ') + '.', true), box.firstChild); save.textContent = '💾 Save tiles'; save.disabled = false; return; }
+          await refresh(note('Tiles saved in both systems (' + changed + ' tile' + (changed === 1 ? '' : 's') + ' changed).', false));
+        });
+      })();
+    }
+
+    // ================= WHO CAN OPEN WHAT (old read-only view) =================
     function drawAccess(){
       wrap.appendChild(mk('p', 'nxu-hint', 'A tick means people in that role see the tile on the Home screen. Inside the four connected apps (Requisition, Engineering Work Card, CP Portal Live, Security Tracking) the database also applies its own rules per role. To change the tiles, use Portal Links.'));
       const tw = mk('div', 'nxu-tw'); const tbl = mk('table', 'nxu-tbl nxu-mx');
@@ -1145,10 +1281,10 @@ var NEXUS_CONFIG={portals:[],departments:[]};
     }
 
     function draw(noteEl){
-      wrap.textContent = ''; box.textContent = ''; drawTabs();
+      wrap.textContent = ''; box.textContent = ''; wrap.style.maxWidth = ''; drawTabs();
       if(tab === 'people') drawPeople(noteEl);
       else if(tab === 'roles') drawRoles(noteEl);
-      else if(tab === 'access') drawAccess();
+      else if(tab === 'access') drawTiles(noteEl);
       else if(tab === 'mode') drawMode(noteEl);
       else drawTools();
     }
