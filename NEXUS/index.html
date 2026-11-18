@@ -1413,6 +1413,17 @@ function decodeEmbeddedHtml(b64){
       else if(tab === 'roles') drawRoles(noteEl);
       else if(tab === 'access') drawAccess();
       else drawTools();
+      lockViewOnly();
+    }
+    /* View only: people and roles are added and changed in Gateway of CP, not here */
+    function lockViewOnly(){
+      wrap.querySelectorAll('.nxu-add').forEach(function(e){ e.remove(); });
+      wrap.querySelectorAll('button').forEach(function(b){ if(/^(\+ Add|Add |Save|Reset password|Delete|New random)/.test(b.textContent.trim())) b.remove(); });
+      wrap.querySelectorAll('table input, table select').forEach(function(e){ e.disabled = true; });
+      wrap.querySelectorAll('table tr').forEach(function(tr){
+        const c = tr.lastElementChild; if(c && /^Actions$/.test(c.textContent.trim()) ){ const i = Array.prototype.indexOf.call(tr.children, c); tr.closest('table').querySelectorAll('tr').forEach(function(r2){ if(r2.children[i]) r2.children[i].style.display = 'none'; }); }
+      });
+      if(!wrap.querySelector('.nxu-viewonly')){ const n = mk('p', 'nxu-hint nxu-viewonly', 'View only. To add or change people and roles, use Gateway of CP.'); n.style.cssText = 'color:#ffe08c;font-weight:700;'; wrap.insertBefore(n, wrap.firstChild); }
     }
     draw(keepNote);
   }
