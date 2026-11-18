@@ -879,7 +879,31 @@ var NEXUS_CONFIG={portals:[],departments:[]};
       const rf = roleSelect('', true); const sf = mk('select');
       [['', 'All status'], ['on', 'Active'], ['off', 'Disabled']].forEach(function(o){ const op = mk('option', '', o[1]); op.value = o[0]; sf.appendChild(op); });
       const addToggle = mk('button', 'nxu-btn', '+ Add person'); addToggle.type = 'button';
-      [q, rf, sf, addToggle].forEach(function(n){ bar.appendChild(n); });
+      const missing = WS.canWrite ? users.filter(function(u){ return !WS.byLogin[u.username]; }) : [];
+      const fixBtn = mk('button', 'nxu-btn ghost', 'Create missing CP WORKSPACE logins (' + missing.length + ')'); fixBtn.type = 'button';
+      fixBtn.style.display = missing.length ? '' : 'none';
+      [q, rf, sf, addToggle, fixBtn].forEach(function(n){ bar.appendChild(n); });
+      let fixArmed = false;
+      fixBtn.addEventListener('click', async function(){
+        if(!fixArmed){ fixArmed = true; fixBtn.textContent = 'Click again: creates ' + missing.length + ' logins and sets NEW passwords'; setTimeout(function(){ fixArmed = false; fixBtn.textContent = 'Create missing CP WORKSPACE logins (' + missing.length + ')'; }, 6000); return; }
+        fixBtn.disabled = true; fixBtn.textContent = 'Creating…';
+        const done = [], fail = [];
+        for(const u of missing){
+          const did = WS.deptId[wsCodeFor(u.role_id)];
+          if(!did){ fail.push(u.username + ' (department not in CP WORKSPACE)'); continue; }
+          const tmp = randomPassword();
+          const w = await wsFn({ module: 'none', login_id: u.username, full_name: u.display_name || u.username, department_id: did, password: tmp });
+          if(!w.ok){ fail.push(u.username + ' (' + wsText(w.error) + ')'); continue; }
+          const r = await adminCall('nexus_admin_save_user', { p_username: u.username, p_display_name: u.display_name || u.username, p_role_id: u.role_id, p_active: u.active, p_password: tmp });
+          if(!r.ok){ fail.push(u.username + ' (created in CP WORKSPACE but the CP NEXUS password could not be matched)'); continue; }
+          done.push(u.username + ' : ' + tmp);
+        }
+        const text = done.join('\n');
+        const n = note((done.length ? 'Created ' + done.length + ' login(s). NEW password for each (shown once, give privately; they must change it at next sign-in):' : 'No login was created.') + (fail.length ? '  Not done: ' + fail.join('; ') + '.' : ''), fail.length > 0 && !done.length);
+        if(done.length){ const pre = mk('pre'); pre.textContent = text; pre.style.cssText = 'width:100%;margin:8px 0 0;padding:10px;background:#fff;color:#000;border-radius:8px;font-size:14px;font-weight:700;white-space:pre-wrap'; n.appendChild(pre);
+          const cp = mk('button', 'nxu-btn small', 'Copy all'); cp.type = 'button'; cp.addEventListener('click', function(){ try{ navigator.clipboard.writeText(text); cp.textContent = 'Copied'; }catch(e){ cp.textContent = 'Select and copy'; } }); n.appendChild(cp); }
+        await refresh(n);
+      });
       wrap.appendChild(bar);
 
       // add form
