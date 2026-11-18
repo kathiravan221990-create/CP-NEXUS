@@ -446,7 +446,7 @@ function openPortalLinks(){
     document.body.appendChild(m); document.getElementById("plClose").onclick=function(){m.style.display="none";};}
   document.getElementById("plWs").value=WS_APP; document.getElementById("plNx").value=NX_APP; m.style.display="flex";
 }
-$("out").onclick=function(){bellStop();signOutAll();me=null;fails=0;$("u").value="";$("p").value="";$("dd").value="";show($("home"),false);show($("login"),true);};
+$("out").onclick=function(){bellStop();signOutAll();gwClear();me=null;fails=0;$("u").value="";$("p").value="";$("dd").value="";show($("home"),false);show($("login"),true);};
 $("form").onsubmit=function(e){
   e.preventDefault(); var er=$("err"), btn=e.target.querySelector(".btn");
   if(locked){er.textContent="Too many wrong attempts. Please wait 15 minutes and try again.";show(er,true);return;}
@@ -462,7 +462,7 @@ $("form").onsubmit=function(e){
       show(er,true); return;
     }
     fails=0; show(er,false); me={login:login,ws:r[0],nx:r[1]};
-    $("p").value=""; show($("login"),false); show($("home"),true); render(); bellStart();
+    $("p").value=""; gwSave(); show($("login"),false); show($("home"),true); render(); bellStart();
   });
 };
 
@@ -482,7 +482,36 @@ function signOutAll(keepHanded){
   if(me.ws&&me.ws.tok&&!(keepHanded&&me.ws.handed)) fetch(WS_URL+"/auth/v1/logout",{method:"POST",keepalive:true,headers:{apikey:WS_KEY,Authorization:"Bearer "+me.ws.tok}}).catch(function(){});
   if(me.nx&&me.nx.token&&!(keepHanded&&me.nx.handed)) fetch(NX_URL+"/rest/v1/rpc/nexus_logout",{method:"POST",keepalive:true,headers:NX_H(),body:JSON.stringify({p_token:me.nx.token})}).catch(function(){});
 }
-window.addEventListener("pagehide",function(){signOutAll(true);});
+/* stay signed in until Log Out is pressed: the session is kept in this browser and checked again on return */
+var GW_KEY="cp_gw_session";
+function gwSave(){try{localStorage.setItem(GW_KEY,JSON.stringify({login:me.login,ws:me.ws,nx:me.nx}));}catch(e){}}
+function gwClear(){try{localStorage.removeItem(GW_KEY);}catch(e){}}
+function gwRestore(){
+  var raw=null; try{raw=JSON.parse(localStorage.getItem(GW_KEY)||"null");}catch(e){}
+  if(!raw||!raw.login||(!raw.ws&&!raw.nx)){gwClear();return;}
+  var wsP=Promise.resolve(null), nxP=Promise.resolve(null);
+  if(raw.ws&&raw.ws.tok){
+    var H2={apikey:WS_KEY,Authorization:"Bearer "+raw.ws.tok,"Content-Type":"application/json","Content-Profile":"core_api","Accept-Profile":"core_api"};
+    wsP=jf(WS_URL+"/rest/v1/rpc/me",{method:"POST",headers:H2,body:"{}"}).then(function(m){
+      if(m.ok&&m.json) return raw.ws;
+      if(!raw.ws.rtok) return null;
+      return jf(WS_URL+"/auth/v1/token?grant_type=refresh_token",{method:"POST",headers:{apikey:WS_KEY,"Content-Type":"application/json"},body:JSON.stringify({refresh_token:raw.ws.rtok})}).then(function(a){
+        if(!a.ok||!a.json||!a.json.access_token) return null;
+        raw.ws.tok=a.json.access_token; raw.ws.rtok=a.json.refresh_token||raw.ws.rtok; return raw.ws;
+      });
+    }).catch(function(){return null;});
+  }
+  if(raw.nx&&raw.nx.token){
+    nxP=jf(NX_URL+"/rest/v1/rpc/nexus_whoami",{method:"POST",headers:{apikey:NX_KEY,Authorization:"Bearer "+NX_KEY,"Content-Type":"application/json","x-nexus-token":raw.nx.token},body:"{}"}).then(function(w){
+      return (w.ok&&w.json&&w.json.signed_in)?raw.nx:null;
+    }).catch(function(){return null;});
+  }
+  Promise.all([wsP,nxP]).then(function(r){
+    if(!r[0]&&!r[1]){gwClear();return;}
+    me={login:raw.login,ws:r[0],nx:r[1]}; gwSave();
+    show($("login"),false); show($("home"),true); render(); bellStart();
+  });
+}
 function openFs(title,sub){ $("fsT").textContent=title; $("fsS").textContent=sub; $("fsBody").innerHTML=""; show($("fs"),true); document.body.style.overflow="hidden"; }
 $("fsBack").onclick=function(){ show($("fs"),false); $("fsBody").innerHTML=""; document.body.style.overflow=""; };
 function el(tag,cls,text){var e=document.createElement(tag); if(cls)e.className=cls; if(text!=null)e.textContent=text; return e;}
@@ -1192,6 +1221,7 @@ function bellStop(){ if(bellState.timer){clearInterval(bellState.timer);bellStat
 $("bell").onclick=function(){ bellState.open=!bellState.open; $("bellPanel").style.display=bellState.open?"flex":"none"; if(bellState.open) bellRefresh(); };
 $("bellX").onclick=function(){ bellState.open=false; $("bellPanel").style.display="none"; };
 $("bellAll").onclick=function(){ if(!(me&&me.nx))return; jf(NX_URL+"/rest/v1/rpc/notif_read",{method:"POST",headers:NX_H(),body:JSON.stringify({p_token:me.nx.token})}).then(bellRefresh); };
+gwRestore();
 </script>
 </body>
 </html>
