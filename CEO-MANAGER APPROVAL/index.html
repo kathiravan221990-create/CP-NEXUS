@@ -409,9 +409,6 @@ async function load(quiet){
    jobs.push(sbq('req_documents?select=id,req_id,name,type,size&order=created_at.asc').then(a=>{docs=a||[]},e=>{docs=[]}));
    jobs.push(sbq('req_settings?select=*').then(a=>{settings=Object.fromEntries((a||[]).map(x=>[x.key,x.value]))},e=>{}));
   }
-  {const d0=new Date();d0.setHours(0,0,0,0);const t0=encodeURIComponent(d0.toISOString());
-   jobs.push(sbw('ewc_tickets?updated_at=gte.'+t0+'&status=in.(running,denied,closed,done,completed)&select=status').then(a=>{window._wcDay=a||[]},e=>{window._wcDay=[]}));
-   jobs.push(sbq('req_requisitions?or=(approved_at.gte.'+t0+',ceo_at.gte.'+t0+')&status=eq.Approved&select=id').then(a=>{window._rqOk=(a||[]).length},e=>{window._rqOk=0}));}
   if(ME.role==='manager')jobs.push(empLoad().then(()=>{},e=>{em=[];warns.push('New employees could not be read: '+e.message)}));
   await Promise.all(jobs);
  };
@@ -456,9 +453,8 @@ const rqAmt=()=>rq.reduce((s,r)=>s+Number(r.amount||0),0),wcAmt=()=>wc.reduce((s
 function render(){
  const emP=em.filter(x=>x.status==='PENDING');const n=wc.length+rq.length+emP.length;
  document.title=(n?'('+n+') ':'')+'CP Approvals';
- const wd=window._wcDay||[];dayOk=wd.filter(x=>x.status!=='denied').length+(window._rqOk||0);dayNo=wd.filter(x=>x.status==='denied').length;
  const fb=(k,c,l)=>`<button class="fb${filter===k?' on':''}" onclick="filter='${k}';render()">${l}<b>${c}</b></button>`;
- $('#tiles').innerHTML=`<div class="kp"><div class="am"><small>Waiting</small><b>${n}</b></div><div class="gr"><small>Approved</small><b>${dayOk}</b></div><div class="rd"><small>Rejected</small><b>${dayNo}</b></div></div><div class="fbs">${fb('ALL',n,'All')}${fb('WC',wc.length,'Work Card')}${fb('RQ',rq.length,'Requisition')}${ME&&ME.role==='manager'?fb('EM',emP.length,'New Employee'):''}</div>`;
+ $('#tiles').innerHTML=`<div class="fbs">${fb('ALL',n,'All')}${fb('WC',wc.length,'Work Card')}${fb('RQ',rq.length,'Requisition')}${ME&&ME.role==='manager'?fb('EM',emP.length,'New Employee'):''}</div>`;
  const s=q.trim().toLowerCase();
  let items=[];
  if(filter!=='RQ'&&filter!=='EM')wc.forEach(t=>items.push({k:'WC',id:t.id,ts:t.raised_at,t}));
