@@ -390,7 +390,7 @@ function render(){
   $("hi").textContent="Welcome, "+who;
   $("lead").textContent="You are signed in as "+dept+". Choose where to work.";
   var mismatch=false;
-  if(ws&&nx){ var want=DEPT_TO_NX[ws.code]; mismatch=(want!==nx.role); }
+  if(ws&&nx){ var want=DEPT_TO_NX[ws.code]||String(ws.code||'').toLowerCase(); mismatch=(want!==nx.role); }
   var wrap=$("tiles"); wrap.innerHTML="";
   function tile(title,tag,state,msg,chips,url){
     var d=document.createElement("div"); d.className="tile"+(state==="ok"?"":" locked");
@@ -752,6 +752,7 @@ var NEXUS_CONFIG={portals:[],departments:[]};
     (u.json || []).forEach(function(x){ out.byLogin[(x.email || '').split('@')[0]] = x; });
     return out;
   }
+  function wsCodeFor(roleId){ return WS_CODE_FOR_NX[roleId] || String(roleId || '').toUpperCase(); }
   function wsText(e){ return /jwt|expired|401/i.test(String(e)) ? 'your CP WORKSPACE sign-in has expired. Log out and sign in again' : String(e); }
   function errText(r){ return r.error === 'network' ? 'Could not reach the service. Try again.' : (ADMIN_ERR[r.error] || 'Could not save (' + r.error + ').'); }
 
@@ -1007,7 +1008,22 @@ var NEXUS_CONFIG={portals:[],departments:[]};
       rbtn.addEventListener('click', async function(){
         const r = await adminCall('nexus_admin_save_role', { p_role_id: ri.value, p_name: rnn.value, p_is_admin: rac.checked, p_active: true });
         if(!r.ok){ box.insertBefore(note(errText(r), true), box.firstChild); return; }
-        await refresh(note('Department added. Choose which tiles it sees in Who can open what.', false));
+        let extra = '';
+        if(!WS.canWrite) extra = ' CP WORKSPACE department NOT added: sign in with a CP WORKSPACE administrator login to add it in both.';
+        else {
+          const code = wsCodeFor(ri.value.trim().toLowerCase());
+          if(WS.deptId[code]) extra = ' (CP WORKSPACE already had this department, kept as it is.)';
+          else {
+            const w = await wsApi('department_save', { p_id: null, p_code: code, p_name: rnn.value.trim(), p_active: true, p_payroll_role: null });
+            if(!w.ok){
+              await adminCall('nexus_admin_delete_role', { p_role_id: ri.value.trim().toLowerCase() });
+              await refresh(note('Not added. CP WORKSPACE said: ' + wsText(w.error) + '. Nothing was created in either system.', true));
+              return;
+            }
+            extra = ' Added in CP WORKSPACE and CP NEXUS.';
+          }
+        }
+        await refresh(note('Department added.' + extra + ' Choose which tiles it sees in Portal Links.', false));
       });
       if(noteEl) box.insertBefore(noteEl, box.firstChild);
       wrap.appendChild(box);
@@ -1029,14 +1045,25 @@ var NEXUS_CONFIG={portals:[],departments:[]};
           sv.disabled = true; sv.textContent = 'Saving…';
           const res = await adminCall('nexus_admin_save_role', { p_role_id: r.role_id, p_name: rn.value, p_is_admin: adc.checked, p_active: acc.checked });
           if(!res.ok){ sv.textContent = 'Save'; sv.disabled = false; box.insertBefore(note(errText(res), true), box.firstChild); return; }
-          await refresh(note('Saved role ' + r.role_id + '.', false));
+          let msg = 'Saved role ' + r.role_id + '.';
+          if(WS.canWrite){
+            const code = wsCodeFor(r.role_id), did = WS.deptId[code];
+            if(did){ const w = await wsApi('department_save', { p_id: did, p_code: code, p_name: rn.value.trim(), p_active: acc.checked, p_payroll_role: null }); msg += w.ok ? ' Also updated in CP WORKSPACE.' : ' CP WORKSPACE NOT updated: ' + wsText(w.error) + '.'; }
+            else msg += ' This department does not exist in CP WORKSPACE.';
+          } else msg += ' CP WORKSPACE not updated (sign in with a CP WORKSPACE administrator login).';
+          await refresh(note(msg, false));
         });
         let darm = false;
         dl.addEventListener('click', async function(){
           if(!darm){ darm = true; dl.textContent = 'Click again to confirm'; setTimeout(function(){ darm = false; dl.textContent = 'Delete'; }, 4000); return; }
           const res = await adminCall('nexus_admin_delete_role', { p_role_id: r.role_id });
           if(!res.ok){ box.insertBefore(note(errText(res), true), box.firstChild); return; }
-          await refresh(note('Deleted role ' + r.role_id + '.', false));
+          let dmsg = '';
+          if(WS.canWrite){
+            const code = wsCodeFor(r.role_id), did = WS.deptId[code];
+            if(did){ const w = await wsApi('department_save', { p_id: did, p_code: code, p_name: r.name, p_active: false, p_payroll_role: null }); dmsg = w.ok ? ' Switched off in CP WORKSPACE (it is kept there so old records stay readable).' : ' CP WORKSPACE NOT switched off: ' + wsText(w.error) + '.'; }
+          }
+          await refresh(note('Deleted role ' + r.role_id + '.' + dmsg, false));
         });
         const cMod = mk('td'); cMod.appendChild(wsChips(r.name, false));
         [c1, c2, c3, cMod, c4, c5, c6].forEach(function(c){ tr.appendChild(c); });
