@@ -2013,6 +2013,22 @@ function decodeEmbeddedHtml(b64){
       list.appendChild(row);
     });
 
+    // ---- tile name, link, show/hide, add and delete are set in Gateway of CP: view only here ----
+    (function(){
+      const kids = Array.prototype.slice.call(list.children);
+      kids.forEach(function(k){
+        if(k.tagName === 'H4') return;
+        if(k.classList && k.classList.contains('plink-row')){
+          const b = k.querySelector('b');
+          if(b && /^Add a new portal tile/i.test(b.textContent)){ k.remove(); return; }
+          k.querySelectorAll('input').forEach(function(x){ x.disabled = true; });
+          k.querySelectorAll('.plink-actions').forEach(function(x){ x.remove(); });
+        }
+      });
+      const note = el('p', 'plink-hint', 'View only. Tile name, link, show/hide and new tiles are set in Gateway of CP (Users & Departments, then Tiles).');
+      list.insertBefore(note, list.firstChild);
+    })();
+
     // ---- uploaded app files ----
     list.appendChild(el('h4', 'plink-h', 'Upload new version of an app'));
     const hint = el('div', 'plink-hint', 'For apps built into NEXUS. Choose the new .html file; everyone gets it the next time they open that tile. "Reset" goes back to the copy built into NEXUS.');

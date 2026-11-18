@@ -1144,6 +1144,74 @@ var NEXUS_CONFIG={portals:[],departments:[]};
     }
     const TG_DEP_IC = { administrator: '👑', manager: '🧭', ceo: '🎖️', hr_admin: '👥', production: '🏭', scm: '📦', engineering: '🔧', maintenance: '🛠️', security: '💂', quality: '✅' };
     const TG_TILE_IC = { pms: '🏭', payroll: '💰', quality: '✅', tincost: '🧮', pf_esi: '🛡️', cp_portal: '🌐', eng_worklog: '🛠️', requisition: '📝', approvals: '✔️', security_tracking: '🚧', ip_security: '🔒' };
+    /* Tile details: name, link, show/hide and new tiles for both systems (view only inside each system) */
+    function tileDetails(holder, nxAll, wsAll, nxOk){
+      const card = mk('div', 'tg-card'); card.style.padding = '16px'; card.style.marginTop = '18px';
+      card.appendChild(mk('h3', null, 'Tile details'));
+      card.appendChild(mk('p', 'nxu-hint', 'Change a tile name, link or show/hide here. CP WORKSPACE and CP NEXUS only display it. Tiles are hidden, not deleted.'));
+      const nh = function(extra){ const h = { apikey: NX_KEY, Authorization: 'Bearer ' + NX_KEY, 'Content-Type': 'application/json', 'x-nexus-token': getToken() || '' }; for(const k in (extra || {})) h[k] = extra[k]; return h; };
+      function row(sys, label, title, sub, url, active, onSave){
+        const r = mk('div'); r.style.cssText = 'display:grid;grid-template-columns:130px 1.1fr 1fr 1.6fr auto auto;gap:8px;align-items:center;margin:6px 0';
+        const tag = mk('b', null, label); const t = mk('input'); t.value = title || ''; t.placeholder = 'Name';
+        const sb = mk('input'); sb.value = sub || ''; sb.placeholder = sys === 'nx' ? 'Subtitle' : '(no subtitle)'; sb.disabled = sys !== 'nx';
+        const u = mk('input'); u.value = url || ''; u.placeholder = 'https://...';
+        const vl = mk('label'); const cb = mk('input'); cb.type = 'checkbox'; cb.checked = active; vl.appendChild(cb); vl.appendChild(document.createTextNode(' Show'));
+        const bt = mk('button', 'nxu-btn', 'Save'); bt.type = 'button'; const msg = mk('span', 'sub', ''); msg.style.gridColumn = '2 / -1';
+        [tag, t, sb, u, vl, bt].forEach(function(x){ r.appendChild(x); }); r.appendChild(msg);
+        bt.addEventListener('click', async function(){
+          const v = u.value.trim();
+          if(!t.value.trim()) { msg.textContent = 'Enter a name.'; return; }
+          if(v && !/^https:\/\//i.test(v)) { msg.textContent = 'Link must start with https://'; return; }
+          bt.disabled = true; msg.textContent = 'Saving…';
+          const e = await onSave({ title: t.value.trim(), sub: sb.value.trim(), url: v, active: cb.checked });
+          bt.disabled = false; msg.textContent = e ? ('Not saved: ' + e) : 'Saved.';
+        });
+        return r;
+      }
+      if(nxOk) nxAll.forEach(function(p){
+        card.appendChild(row('nx', 'CP NEXUS', p.title, p.subtitle, '', p.active !== false, async function(v){
+          const r1 = await jf(NX_URL + '/rest/v1/nexus_portals?portal_id=eq.' + encodeURIComponent(p.portal_id), { method: 'PATCH', headers: nh({ Prefer: 'return=representation' }), body: JSON.stringify({ title: v.title, subtitle: v.sub, active: v.active, updated_at: new Date().toISOString(), updated_by: (me && me.login) || 'gateway' }) });
+          if(!r1.ok || !Array.isArray(r1.json) || !r1.json.length) return 'CP NEXUS refused the change';
+          if(v.url){ const r2 = await jf(NX_URL + '/rest/v1/portal_links?on_conflict=portal_id', { method: 'POST', headers: nh({ Prefer: 'resolution=merge-duplicates,return=minimal' }), body: JSON.stringify({ portal_id: p.portal_id, url: v.url, updated_at: new Date().toISOString() }) }); if(!r2.ok) return 'name saved, link refused'; }
+          return '';
+        }));
+      });
+      if(WS.canWrite) wsAll.forEach(function(p){
+        card.appendChild(row('ws', 'CP WORKSPACE', p.title, '', p.url, p.active !== false, async function(v){
+          if(!v.url) return 'WORKSPACE tiles need a link';
+          const w = await wsApi('portal_link_save', { p_code: p.code, p_title: v.title, p_url: v.url, p_active: v.active, p_depts: p.depts || ['ADMIN'] });
+          return w.ok ? '' : wsText(w.error);
+        }));
+      });
+      // add a new tile
+      const add = mk('div'); add.style.cssText = 'margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.12)';
+      add.appendChild(mk('b', null, 'Add a new tile'));
+      const ar = mk('div'); ar.style.cssText = 'display:grid;grid-template-columns:150px 1fr 1fr 1.6fr auto;gap:8px;margin-top:8px;align-items:center';
+      const sel = mk('select'); [['nx', 'CP NEXUS'], ['ws', 'CP WORKSPACE']].forEach(function(o){ const op = mk('option', null, o[1]); op.value = o[0]; sel.appendChild(op); });
+      const n1 = mk('input'); n1.placeholder = 'Name'; const n2 = mk('input'); n2.placeholder = 'Subtitle (NEXUS)'; const n3 = mk('input'); n3.placeholder = 'https://...';
+      const ab = mk('button', 'nxu-btn', 'Add tile'); ab.type = 'button'; const am = mk('span', 'sub', ''); am.style.gridColumn = '1 / -1';
+      [sel, n1, n2, n3, ab, am].forEach(function(x){ ar.appendChild(x); }); add.appendChild(ar); card.appendChild(add);
+      ab.addEventListener('click', async function(){
+        const title = n1.value.trim(), url = n3.value.trim();
+        if(!title || !/^https:\/\//i.test(url)){ am.textContent = 'Enter a name and a link that starts with https://'; return; }
+        const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'tile';
+        ab.disabled = true; am.textContent = 'Adding…'; let err = '';
+        if(sel.value === 'nx'){
+          const maxSort = nxAll.reduce(function(m, x){ return Math.max(m, x.sort_order || 0); }, 0);
+          let id = slug, n = 2; while(nxAll.some(function(x){ return x.portal_id === id; })) id = slug + '_' + (n++);
+          const r1 = await jf(NX_URL + '/rest/v1/nexus_portals', { method: 'POST', headers: nh({ Prefer: 'return=representation' }), body: JSON.stringify({ portal_id: id, title: title, subtitle: n2.value.trim(), url: url, icon: 'default', sort_order: maxSort + 10, active: true, allowed_depts: [], updated_by: (me && me.login) || 'gateway' }) });
+          if(!r1.ok) err = 'CP NEXUS refused the new tile';
+        } else {
+          if(!WS.canWrite) err = 'sign in with a CP WORKSPACE administrator login';
+          else { const w = await wsApi('portal_link_save', { p_code: slug.replace(/_/g, '-'), p_title: title, p_url: url, p_active: true, p_depts: ['ADMIN','MANAGER'] }); if(!w.ok) err = wsText(w.error); }
+        }
+        ab.disabled = false;
+        if(err){ am.textContent = 'Not added: ' + err; return; }
+        go('access');
+      });
+      holder.appendChild(card);
+    }
+
     function drawTiles(noteEl){
       tilesStyle(); wrap.style.maxWidth = 'none';
       wrap.appendChild(mk('p', 'nxu-hint', 'Tick a box to let that department see the tile. Gold = can open. Green = locked (always on). Saving updates CP WORKSPACE and CP NEXUS together; they only show the result.'));
@@ -1207,6 +1275,7 @@ var NEXUS_CONFIG={portals:[],departments:[]};
         const foot = mk('div', 'tg-foot'); const save = mk('button', 'nxu-btn', '💾 Save tiles'); save.type = 'button'; save.disabled = true;
         const undo = mk('button', 'nxu-btn ghost', '↺ Undo changes'); undo.type = 'button';
         foot.appendChild(save); foot.appendChild(undo); foot.appendChild(mk('span', 'sub', 'Saving updates both systems at once. Only Administrator and Manager see this tab.')); holder.appendChild(foot);
+        tileDetails(holder, (nxr.ok && Array.isArray(nxr.json) ? nxr.json : []).filter(function(r){ return r.portal_id !== 'portal_links'; }), (wsr.ok && Array.isArray(wsr.json) ? wsr.json : []), nxr.ok);
         function dirtyChk(){ save.disabled = JSON.stringify(state) === snap; }
         undo.addEventListener('click', function(){ go('access'); });
         save.addEventListener('click', async function(){
