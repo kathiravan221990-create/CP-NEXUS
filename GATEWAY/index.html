@@ -338,12 +338,12 @@ main h2{font-size:24px;color:var(--bright)}
       <h3>CP IP-SECURITY</h3>
       <button class="ipsec-x" id="ipsecClose">&times;</button>
     </div>
-    <div class="ipsec-sub">Manage networks allowed to sign in to CP Nexus.</div>
+    <div class="ipsec-sub">One list for CP NEXUS and CP WORKSPACE.</div>
 
     <div class="ipsec-section" id="ipsecSwitchBox">
       <div class="ipsec-row" style="align-items:center">
         <div class="ipsec-row-main"><b id="ipsecSwitchTitle" style="font-family:inherit">IP Security: ON</b>
-          <span id="ipsecSwitchSub">Only the networks listed below can sign in (Manager and CEO are exempt).</span></div>
+          <span id="ipsecSwitchSub">Only the networks listed below can sign in </span></div>
         <button type="button" id="ipsecSwitchBtn" class="ipsec-replace" style="min-width:120px">Turn OFF</button>
       </div>
     </div>
@@ -351,6 +351,14 @@ main h2{font-size:24px;color:var(--bright)}
     <div class="ipsec-section">
       <h4>Default IPs <span>always allowed, no expiry</span></h4>
       <div id="ipsecDefaultList" class="ipsec-list"></div>
+      <form id="ipsecAddDefForm" class="ipsec-add-form">
+        <input id="ipsecDefIp" type="text" placeholder="IP address (e.g. 223.178.84.3)" required>
+        <input id="ipsecDefLabel" type="text" placeholder="Label (e.g. Office WiFi)">
+        <div class="ipsec-add-form-row">
+          <button type="button" id="ipsecUseCurrentIp2" class="ipsec-link-btn">Use My Current IP</button>
+          <button type="submit" class="btn-primary ipsec-add-btn">Add Default IP</button>
+        </div>
+      </form>
     </div>
 
     <div class="ipsec-section">
@@ -513,7 +521,7 @@ function render(){
   var mismatch=false;
   if(ws&&nx){ var want=DEPT_TO_NX[ws.code]||String(ws.code||'').toLowerCase(); mismatch=(want!==nx.role); }
   var wrap=$("tiles"); wrap.innerHTML=""; var idx=0;
-  var isAdm=(nx&&nx.isAdmin)||(ws&&(ws.code==="ADMIN"||ws.code==="MANAGER"));
+  var isAdm=(nx&&(nx.isAdmin||nx.role==="manager"))||(ws&&(ws.code==="ADMIN"||ws.code==="MANAGER"));
   var isSup=(nx&&nx.isSuper)||(ws&&ws.canManage);
   $("btnIpSec").style.display=isAdm?"":"none"; $("bUsers").style.display=isSup?"":"none";
   function gtile(img,name,sub,fn){
@@ -1549,95 +1557,127 @@ const btnIpSec = document.getElementById('btnIpSec');
     const hb = document.getElementById('btnIpSec');
     if(hb){ const sp = hb.querySelector('span'); if(sp) sp.textContent = off ? '🔓 IP Security: OFF' : '🔒 IP Security'; }
   }
-  document.addEventListener('click', async function(ev){
-    if(!ev.target || ev.target.id !== 'ipsecSwitchBtn') return;
-    const goingOff = !(await IP_SECURITY.isOff(true));
-    if(goingOff && !confirm('Turn IP Security OFF?\n\nEveryone with a valid login will be able to sign in from any network until you turn it ON again.')) return;
-    ev.target.disabled = true;
-    const ok = await IP_SECURITY.setOn(!goingOff);
-    ev.target.disabled = false;
-    if(!ok){ alert('Could not change the setting. Run NEXUS_IPSEC_SWITCH.sql in Supabase first, and make sure you are signed in as Manager.'); return; }
-    await refreshIpSwitch(true);
-  });
+
+  /* ===== CP IP-SECURITY (one place): every change is written to CP NEXUS and CP WORKSPACE together ===== */
+  function ipCanEdit(){ return !!me && ((me.nx&&(me.nx.isAdmin||me.nx.role==='manager')) || (me.ws&&(me.ws.code==='ADMIN'||me.ws.code==='MANAGER'))); }
+  function ipClean(c){ return String(c||'').replace(/\/32$/,''); }
+  function ipEsc(x){ return String(x==null?'':x).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function wsRpc(fn,args){
+    if(!me||!me.ws||!me.ws.tok) return Promise.resolve({ok:false,err:'no_ws'});
+    return jf(WS_URL+'/rest/v1/rpc/'+fn,{method:'POST',headers:WS_H(me.ws.tok),body:JSON.stringify(args||{})}).then(function(r){
+      return {ok:r.ok,json:r.json,err:r.ok?null:((r.json&&(r.json.message||r.json.hint))||('error '+r.status))};
+    }).catch(function(e){return {ok:false,err:String(e)};});
+  }
+  async function ipLoad(){
+    var out={rows:[],nxOn:null,wsOn:null,myIp:null,nxErr:null,wsErr:null};
+    var map={};
+    function put(ip,kind,label,exp,sys,id){ var k=ip+'|'+kind; var r=map[k]||(map[k]={ip:ip,kind:kind,label:label||'',exp:exp,nx:null,ws:null}); if(label&&!r.label) r.label=label; r[sys]=id; if(exp) r.exp=exp; }
+    if(me&&me.nx){
+      try{
+        var a=await jf(NX_URL+'/rest/v1/allowed_ips?select=*&order=type',{headers:NX_H()});
+        if(!a.ok||!Array.isArray(a.json)) throw new Error('x');
+        a.json.forEach(function(r){ put(ipClean(r.ip_address), r.type==='temporary'?'temporary':'default', r.label, r.expires_at, 'nx', r.id); });
+        var st=await jf(NX_URL+'/rest/v1/nexus_settings?select=value&key=eq.ip_security',{headers:NX_H()});
+        out.nxOn=!(st.ok&&Array.isArray(st.json)&&st.json[0]&&st.json[0].value==='off');
+      }catch(e){ out.nxErr='NEXUS list failed'; }
+    }
+    if(me&&me.ws){
+      var l=await wsRpc('allowed_ips_list',{});
+      if(l.ok&&Array.isArray(l.json)){ l.json.forEach(function(r){ if(r.your_ip){ out.myIp=String(r.your_ip).split('/')[0]; return; } put(ipClean(r.cidr), r.kind==='temporary'?'temporary':'default', r.label, r.expires_at, 'ws', r.id); });
+        var g=await wsRpc('ip_security_get',{}); out.wsOn=g.ok?(g.json!==false):null; }
+      else out.wsErr=l.err||'WORKSPACE list failed';
+    }
+    var now=Date.now();
+    out.rows=Object.keys(map).map(function(k){return map[k];}).filter(function(r){ return r.kind!=='temporary'||!r.exp||new Date(r.exp).getTime()>now; });
+    return out;
+  }
+  async function ipAdd(ip,label,temp){
+    var res=[];
+    if(me&&me.nx){
+      var row={ip_address:ip,type:temp?'temporary':'default',label:label||null}; if(temp) row.expires_at=new Date(Date.now()+6*3600*1000).toISOString();
+      var a=await jf(NX_URL+'/rest/v1/allowed_ips',{method:'POST',headers:Object.assign(NX_H(),{Prefer:'return=minimal'}),body:JSON.stringify(row)});
+      res.push(a.ok?null:'NEXUS: could not add'); }
+    if(me&&me.ws){ var r=await wsRpc('allowed_ip_save',{p_id:null,p_cidr:ip+'/32',p_label:label||(temp?'Temporary':'Default'),p_active:true,p_temp:!!temp}); res.push(r.ok?null:'WORKSPACE: '+r.err); }
+    return res.filter(Boolean);
+  }
+  async function ipRemove(row){
+    var res=[];
+    if(row.nx!=null){ var a=await jf(NX_URL+'/rest/v1/allowed_ips?id=eq.'+encodeURIComponent(row.nx),{method:'DELETE',headers:NX_H()}); if(!a.ok) res.push('NEXUS: could not remove'); }
+    if(row.ws!=null){ var r=await wsRpc('allowed_ip_delete',{p_id:row.ws}); if(!r.ok) res.push('WORKSPACE: '+r.err); }
+    return res;
+  }
+  function ipSys(r){
+    function b(on,name){ return '<span class="ipsec-badge" style="'+(on?'':'background:rgba(217,92,92,.16);color:#ff9a9a;border:1px solid rgba(217,92,92,.4)')+'">'+name+(on?'':' missing')+'</span>'; }
+    return (me&&me.nx?b(r.nx!=null,'NEXUS'):'')+(me&&me.ws?b(r.ws!=null,'WORKSPACE'):'');
+  }
+  var ipLast=null;
   async function openIpSecPanel(){
-    refreshIpSwitch(true);
+    var sub=document.querySelector('#ipsecModal .ipsec-sub');
+    var defList=document.getElementById('ipsecDefaultList'), tempList=document.getElementById('ipsecTempList');
     ipsecModal.classList.add('show');
-    const defList = document.getElementById('ipsecDefaultList');
-    const tempList = document.getElementById('ipsecTempList');
-    defList.innerHTML = '<p class="ipsec-empty">Loading…</p>';
-    tempList.innerHTML = '';
-
-    const all = await IP_SECURITY.listAll();
-    const defaults = all.filter(r => r.type === 'default');
-    const temps = all.filter(r => r.type === 'temporary');
-
-    defList.innerHTML = defaults.length ? '' : '<p class="ipsec-empty">No Default IPs yet.</p>';
-    defaults.forEach(r => {
-      const row = document.createElement('div');
-      row.className = 'ipsec-row';
-      row.innerHTML =
-        '<div class="ipsec-row-main"><b>' + r.ip_address + '</b>' +
-        (r.label ? '<span>' + r.label + '</span>' : '') + '</div>' +
-        '<span class="ipsec-badge ipsec-badge-default">Default</span>' +
-        '<button class="ipsec-del" data-id="' + r.id + '">Remove</button>';
-      defList.appendChild(row);
-    });
-    defList.querySelectorAll('.ipsec-del').forEach(btn => {
-      btn.addEventListener('click', async function(){
-        if(!confirm('Remove this Default IP?\n\nPeople on this network will no longer be able to sign in (Manager and CEO are exempt).')) return;
-        btn.disabled = true; btn.textContent = 'Removing…';
-        await IP_SECURITY.deleteRow(btn.getAttribute('data-id'));
-        openIpSecPanel();
-      });
-    });
-
-    tempList.innerHTML = temps.length ? '' : '<p class="ipsec-empty">No Temporary IPs active.</p>';
-    temps.forEach(r => {
-      const row = document.createElement('div');
-      row.className = 'ipsec-row';
-      row.innerHTML =
-        '<div class="ipsec-row-main"><b>' + r.ip_address + '</b>' +
-        (r.label ? '<span>' + r.label + '</span>' : '') +
-        '<span class="ipsec-expiry">' + fmtExpiry(r.expires_at) + '</span></div>' +
-        '<button class="ipsec-del" data-id="' + r.id + '">Remove</button>';
-      tempList.appendChild(row);
-    });
-    tempList.querySelectorAll('.ipsec-del').forEach(btn => {
-      btn.addEventListener('click', async function(){
-        btn.disabled = true; btn.textContent = 'Removing…';
-        await IP_SECURITY.deleteRow(btn.getAttribute('data-id'));
+    defList.innerHTML='<p class="ipsec-empty">Loading…</p>'; tempList.innerHTML='';
+    var d=await ipLoad(); ipLast=d;
+    var edit=ipCanEdit();
+    sub.innerHTML='One list for CP NEXUS and CP WORKSPACE. '+(edit?'Every change here is saved to both.':'View only.')+(d.myIp?' Your current IP: <b style="color:#e8bf5e">'+ipEsc(d.myIp)+'</b>':'');
+    var errs=[d.nxErr,d.wsErr].filter(Boolean);
+    if(errs.length) sub.innerHTML+='<br><span style="color:#ff9a9a">'+ipEsc(errs.join(' | '))+'</span>';
+    var on=(d.nxOn!==false)&&(d.wsOn!==false); var anyOff=(d.nxOn===false)||(d.wsOn===false);
+    var t=document.getElementById('ipsecSwitchTitle'), s=document.getElementById('ipsecSwitchSub'), b=document.getElementById('ipsecSwitchBtn');
+    t.textContent='IP Security: '+(anyOff?(on?'':'PARTLY ')+'OFF':'ON'); t.style.color=anyOff?'#ff9a9a':'#5fd394';
+    s.textContent=(d.nxOn===null?'':'NEXUS: '+(d.nxOn?'ON':'OFF'))+(d.nxOn!==null&&d.wsOn!==null?'  •  ':'')+(d.wsOn===null?'':'WORKSPACE: '+(d.wsOn?'ON':'OFF'))+'. Only the networks below can sign in (Manager, CEO and Administrator are exempt).';
+    b.textContent=anyOff?'Turn ON (both)':'Turn OFF (both)'; b.style.display=edit?'':'none'; b.dataset.on=anyOff?'1':'';
+    ['ipsecAddTempForm','ipsecAddDefForm'].forEach(function(id){var e=document.getElementById(id); if(e) e.style.display=edit?'':'none';});
+    function rowHtml(r,def){
+      return '<div class="ipsec-row"><div class="ipsec-row-main"><b>'+ipEsc(r.ip)+'</b>'+(r.label?'<span>'+ipEsc(r.label)+'</span>':'')+(def?'':'<span class="ipsec-expiry">'+fmtExpiry(r.exp)+'</span>')+'<span>'+ipSys(r)+'</span></div>'
+        +(edit?'<button class="ipsec-del" data-k="'+ipEsc(r.ip+'|'+r.kind)+'">Remove</button>':'')+'</div>';
+    }
+    var defs=d.rows.filter(function(r){return r.kind==='default';}), temps=d.rows.filter(function(r){return r.kind==='temporary';});
+    defList.innerHTML=defs.length?defs.map(function(r){return rowHtml(r,true);}).join(''):'<p class="ipsec-empty">No Default IPs yet.</p>';
+    tempList.innerHTML=temps.length?temps.map(function(r){return rowHtml(r,false);}).join(''):'<p class="ipsec-empty">No Temporary IPs active.</p>';
+    ipsecModal.querySelectorAll('.ipsec-del').forEach(function(btn){
+      btn.addEventListener('click',async function(){
+        var row=ipLast.rows.filter(function(r){return (r.ip+'|'+r.kind)===btn.getAttribute('data-k');})[0]; if(!row) return;
+        if(row.kind==='default'&&!confirm('Remove this Default IP from CP NEXUS and CP WORKSPACE?\n\nPeople on this network will no longer be able to sign in.')) return;
+        btn.disabled=true; btn.textContent='Removing…';
+        var e=await ipRemove(row); if(e.length) alert(e.join('\n'));
         openIpSecPanel();
       });
     });
   }
-
-  if(btnIpSec) btnIpSec.addEventListener('click', openIpSecPanel);
-
-  document.getElementById('ipsecClose').addEventListener('click', function(){
-    ipsecModal.classList.remove('show');
-  });
-
-  document.getElementById('ipsecUseCurrentIp').addEventListener('click', async function(){
-    const btn = this;
-    btn.disabled = true; const old = btn.textContent; btn.textContent = 'Fetching…';
-    const ip = await IP_SECURITY.fetchPublicIp();
-    btn.disabled = false; btn.textContent = old;
-    if(ip) document.getElementById('ipsecTempIp').value = ip;
-  });
-
-  document.getElementById('ipsecAddTempForm').addEventListener('submit', async function(e){
-    e.preventDefault();
-    const ipInput = document.getElementById('ipsecTempIp');
-    const labelInput = document.getElementById('ipsecTempLabel');
-    const ip = ipInput.value.trim();
-    if(!ip) return;
-    const btn = this.querySelector('button[type="submit"]');
-    btn.disabled = true; btn.textContent = 'Adding…';
-    await IP_SECURITY.addTemporary(ip, labelInput.value.trim());
-    btn.disabled = false; btn.textContent = 'Add Temporary IP';
-    ipInput.value = ''; labelInput.value = '';
+  document.getElementById('ipsecSwitchBtn').addEventListener('click',async function(){
+    var turnOn=this.dataset.on==='1';
+    if(!turnOn&&!confirm('Turn IP Security OFF in CP NEXUS and CP WORKSPACE?\n\nEveryone with a valid login will be able to sign in from any network until you turn it ON again.')) return;
+    this.disabled=true; var e=[];
+    if(me&&me.nx){ var a=await jf(NX_URL+'/rest/v1/rpc/nexus_set_ip_security',{method:'POST',headers:NX_H(),body:JSON.stringify({p_token:getToken(),p_on:turnOn})}); if(!a.ok||!a.json||!a.json.ok) e.push('NEXUS: could not change the setting'); }
+    if(me&&me.ws){ var r=await wsRpc('ip_security_set',{p_on:turnOn}); if(!r.ok) e.push('WORKSPACE: '+r.err); }
+    this.disabled=false; if(e.length) alert(e.join('\n'));
     openIpSecPanel();
   });
+  if(btnIpSec) btnIpSec.addEventListener('click', openIpSecPanel);
+  document.getElementById('ipsecClose').addEventListener('click', function(){ ipsecModal.classList.remove('show'); });
+  async function ipMyIp(){ if(ipLast&&ipLast.myIp) return ipLast.myIp; return await IP_SECURITY.fetchPublicIp(); }
+  document.getElementById('ipsecUseCurrentIp').addEventListener('click', async function(){
+    var btn=this; btn.disabled=true; var old=btn.textContent; btn.textContent='Fetching…';
+    var ip=await ipMyIp(); btn.disabled=false; btn.textContent=old; if(ip) document.getElementById('ipsecTempIp').value=ip;
+  });
+  document.getElementById('ipsecUseCurrentIp2').addEventListener('click', async function(){
+    var btn=this; btn.disabled=true; var old=btn.textContent; btn.textContent='Fetching…';
+    var ip=await ipMyIp(); btn.disabled=false; btn.textContent=old; if(ip) document.getElementById('ipsecDefIp').value=ip;
+  });
+  function ipSubmit(formId,ipId,lbId,temp,txt){
+    document.getElementById(formId).addEventListener('submit', async function(e){
+      e.preventDefault();
+      var ip=document.getElementById(ipId).value.trim(); if(!ip) return;
+      if(!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)&&!/^[0-9a-f:]+$/i.test(ip)){ alert('Enter a valid IP address, for example 49.207.10.5'); return; }
+      var btn=this.querySelector('button[type="submit"]'); btn.disabled=true; btn.textContent='Adding…';
+      var er=await ipAdd(ip,document.getElementById(lbId).value.trim(),temp);
+      btn.disabled=false; btn.textContent=txt; if(er.length) alert(er.join('\n'));
+      document.getElementById(ipId).value=''; document.getElementById(lbId).value='';
+      openIpSecPanel();
+    });
+  }
+  ipSubmit('ipsecAddTempForm','ipsecTempIp','ipsecTempLabel',true,'Add Temporary IP');
+  ipSubmit('ipsecAddDefForm','ipsecDefIp','ipsecDefLabel',false,'Add Default IP');
 
 /* Users & Roles button: opens the NEXUS screen; the Gateway first loads the tile list it needs for "Who can open what" */
 $("bUsers").onclick=function(){
@@ -1680,8 +1720,8 @@ $("bellAll").onclick=function(){ if(!(me&&me.nx))return; jf(NX_URL+"/rest/v1/rpc
 waterStart();
 document.addEventListener("click",function(e){ if(!$("login").hidden&&getComputedStyle($("login")).display!=="none") waterDrop(e.clientX,e.clientY,true); });
 gwRestore();
-document.body.insertAdjacentHTML('beforeend','<div style="position:fixed;right:8px;bottom:6px;font:11px sans-serif;color:#fff;opacity:.55;z-index:99999;pointer-events:none">Gateway v18-Nov-1540</div>');
+document.body.insertAdjacentHTML('beforeend','<div style="position:fixed;right:8px;bottom:6px;font:11px sans-serif;color:#fff;opacity:.55;z-index:99999;pointer-events:none">Gateway v18-Nov-1945</div>');
 </script>
-<script>(function(){try{var S='v18-Nov-1540',k='cp_fresh_'+location.pathname;fetch(location.pathname+'?_='+Date.now(),{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/v18-Nov-\d+|v\d+-[A-Za-z]{3}-\d+/);if(m&&m[0]!==S&&sessionStorage.getItem(k)!==m[0]){sessionStorage.setItem(k,m[0]);location.reload()}}).catch(function(){})}catch(e){}})();</script>
+<script>(function(){try{var S='v18-Nov-1945',k='cp_fresh_'+location.pathname;fetch(location.pathname+'?_='+Date.now(),{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/v18-Nov-\d+|v\d+-[A-Za-z]{3}-\d+/);if(m&&m[0]!==S&&sessionStorage.getItem(k)!==m[0]){sessionStorage.setItem(k,m[0]);location.reload()}}).catch(function(){})}catch(e){}})();</script>
 </body>
 </html>
