@@ -351,7 +351,7 @@ function wsCheck(login,pw){
         var dept=m.json.department||{}; var tiles=[];
         var rows=Array.isArray(l.json)?l.json:[];
         rows.forEach(function(r){ if(r.active!==false && (r.depts||[]).indexOf(dept.code)>-1) tiles.push({id:r.code,title:r.title}); });
-        return {name:m.json.full_name,code:dept.code,dept:dept.name,tiles:tiles,tok:tok,rtok:rtok,canManage:((m.json.permissions||{}).core||[]).indexOf('manage_users')>-1};
+        return {must:m.json.must_change_password===true,name:m.json.full_name,code:dept.code,dept:dept.name,tiles:tiles,tok:tok,rtok:rtok,canManage:((m.json.permissions||{}).core||[]).indexOf('manage_users')>-1};
       });
     });
   }).catch(function(){return null});
@@ -362,7 +362,7 @@ function nxCheck(login,pw){
   return jf(NX_URL+"/rest/v1/rpc/nexus_login",{method:"POST",headers:H,body:JSON.stringify({p_username:login,p_password:pw})}).then(function(a){
     if(!a.ok||!a.json||!a.json.ok) return null;
     var u=a.json.user||{};
-    var res={name:u.display_name,role:u.role_id,roleName:u.role_name,isAdmin:u.is_admin===true||u.role_id==='manager',isSuper:u.is_super===true,token:a.json.token,tiles:null};
+    var res={must:u.must_change_password===true,name:u.display_name,role:u.role_id,roleName:u.role_name,isAdmin:u.is_admin===true||u.role_id==='manager',isSuper:u.is_super===true,token:a.json.token,tiles:null};
     return jf(NX_URL+"/rest/v1/nexus_portals?select=*&order=sort_order",{headers:{apikey:NX_KEY,Authorization:"Bearer "+NX_KEY}}).then(function(p){
       if(p.ok&&Array.isArray(p.json)&&p.json.length){
         res.tiles=[];
@@ -463,6 +463,7 @@ $("form").onsubmit=function(e){
     }
     fails=0; show(er,false); me={login:login,ws:r[0],nx:r[1]};
     $("p").value=""; gwSave(); show($("login"),false); show($("home"),true); render(); bellStart();
+    if((me.ws&&me.ws.must)||(me.nx&&me.nx.must)) openPw(true);
   });
 };
 
@@ -517,8 +518,9 @@ $("fsBack").onclick=function(){ show($("fs"),false); $("fsBody").innerHTML=""; d
 function el(tag,cls,text){var e=document.createElement(tag); if(cls)e.className=cls; if(text!=null)e.textContent=text; return e;}
 
 /* Change Password: updates the password in both systems so they stay the same */
-$("bPw").onclick=function(){
-  openFs("Change Password","Your new password is set in CP WORKSPACE and CP NEXUS together.");
+function openPw(forced){
+  openFs(forced?"Set your own password":"Change Password",forced?"You signed in with a temporary password. Choose your own to continue. It is set in CP WORKSPACE and CP NEXUS together.":"Your new password is set in CP WORKSPACE and CP NEXUS together.");
+  if(forced) $("fsBack").style.display="none"; else $("fsBack").style.display="";
   var box=el("div","card pwbox"); 
   var l1=el("label",null,"Current password"), i1=el("input"); i1.type="password"; i1.autocomplete="current-password";
   var l2=el("label",null,"New password (at least 8 characters)"), i2=el("input"); i2.type="password"; i2.autocomplete="new-password";
@@ -537,24 +539,29 @@ $("bPw").onclick=function(){
     if(me.ws){
       p1=jf(WS_URL+"/auth/v1/token?grant_type=password",{method:"POST",headers:{apikey:WS_KEY,"Content-Type":"application/json"},body:JSON.stringify({email:me.login+"@"+LOGIN_DOMAIN,password:o})}).then(function(a){
         if(!a.ok) { bad.push("CP WORKSPACE: current password is incorrect"); return; }
-        return jf(WS_URL+"/auth/v1/user",{method:"PUT",headers:{apikey:WS_KEY,Authorization:"Bearer "+me.ws.tok,"Content-Type":"application/json"},body:JSON.stringify({password:n})}).then(function(u){
+        var ft=(a.json&&a.json.access_token)||me.ws.tok;
+        return jf(WS_URL+"/auth/v1/user",{method:"PUT",headers:{apikey:WS_KEY,Authorization:"Bearer "+ft,"Content-Type":"application/json"},body:JSON.stringify({password:n})}).then(function(u){
           if(!u.ok){ bad.push("CP WORKSPACE: could not update"); return; }
-          return jf(WS_URL+"/rest/v1/rpc/password_done",{method:"POST",headers:WS_H(me.ws.tok),body:"{}"}).then(function(){done.push("CP WORKSPACE");});
+          me.ws.tok=ft; if(a.json&&a.json.refresh_token) me.ws.rtok=a.json.refresh_token; me.ws.must=false;
+          return jf(WS_URL+"/rest/v1/rpc/password_done",{method:"POST",headers:WS_H(ft),body:"{}"}).then(function(){done.push("CP WORKSPACE");});
         });
       });
     }
     p1.then(function(){
       if(!me.nx) return;
       return jf(NX_URL+"/rest/v1/rpc/nexus_change_password",{method:"POST",headers:NX_H(),body:JSON.stringify({p_token:me.nx.token,p_old:o,p_new:n})}).then(function(r){
-        if(r.ok&&r.json&&r.json.ok) done.push("CP NEXUS"); else bad.push("CP NEXUS: "+((r.json&&r.json.error==="wrong_old_password")?"current password is incorrect":"could not update"));
+        if(r.ok&&r.json&&r.json.ok){ done.push("CP NEXUS"); me.nx.must=false; } else bad.push("CP NEXUS: "+((r.json&&r.json.error==="wrong_old_password")?"current password is incorrect":"could not update"));
       });
     }).then(function(){
       b.disabled=false; b.textContent="Update password";
       if(bad.length) return fail((done.length?"Updated in "+done.join(" and ")+". ":"")+"Not updated: "+bad.join("; ")+". Please contact the Administrator so both stay the same.");
+      gwSave();
       okm.textContent="Password updated in "+done.join(" and ")+". Use the new password from your next sign-in."; okm.hidden=false; i1.value=i2.value=i3.value="";
+      if(forced) setTimeout(function(){ $("fsBack").style.display=""; $("fsBack").onclick(); },1200);
     });
   };
-};
+}
+$("bPw").onclick=function(){ openPw(false); };
 
 
 /* ===== code copied from CP NEXUS so the screens look and work the same ===== */

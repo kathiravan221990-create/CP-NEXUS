@@ -1063,7 +1063,7 @@ function decodeEmbeddedHtml(b64){
     }
     setToken(r.token);
     currentUser = cur;
-    runEntry(function(){ enterHome(ip); if(cur.mustChange) openChangePw(true); });
+    runEntry(function(){ enterHome(ip); /* password is changed only in Gateway of CP */ });
   }
 
   // ---------- change my password (forced on first login / after a reset) ----------
@@ -1497,7 +1497,7 @@ function decodeEmbeddedHtml(b64){
       const lo = document.getElementById('btnLogout'); lo.parentNode.insertBefore(cpw, lo);
       cpw.addEventListener('click', function(){ openChangePw(false); });
     }
-    cpw.style.display = (currentUser && currentUser.username) ? '' : 'none';
+    cpw.style.display = 'none'; /* password is changed only in Gateway of CP */
     let ub = document.getElementById('btnUsers');
     if(!ub){
       ub = document.createElement('button'); ub.id = 'btnUsers'; ub.type = 'button';
@@ -2247,7 +2247,7 @@ function decodeEmbeddedHtml(b64){
     if(!viaGw && !(isMgr(cur.dept) || cur.dept.isAdmin) && (await getAccessMode()) === '1'){ show('login'); showGatewayOnly(); return; }   // mode 1: only the Gateway hand-over, or an Administrator
     currentUser = cur;
     enterHome(ip);
-    if(cur.mustChange) openChangePw(true);
+    /* password is changed only in Gateway of CP */
   }
   async function getAccessMode(){ try { const r = await IP_SECURITY.sb.rpc('get_access_mode'); if(r.error || !r.data) return '3'; return String(r.data); } catch(e){ return '3'; } }
   function showGatewayOnly(){
