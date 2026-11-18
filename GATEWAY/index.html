@@ -730,6 +730,29 @@ var NEXUS_CONFIG={portals:[],departments:[]};
     if(res.error || !res.data) return { ok: false, error: 'network' };
     return res.data;
   }
+  /* ---- CP WORKSPACE side: the same person is kept in both systems ---- */
+  const WS_CODE_FOR_NX = {}; Object.keys(DEPT_TO_NX).forEach(function(k){ WS_CODE_FOR_NX[DEPT_TO_NX[k]] = k; });
+  async function wsApi(fn, args){
+    if(!(me && me.ws && me.ws.tok)) return { ok: false, error: 'no_ws' };
+    const r = await jf(WS_URL + '/rest/v1/rpc/' + fn, { method: 'POST', headers: WS_H(me.ws.tok), body: JSON.stringify(args || {}) });
+    return { ok: r.ok, json: r.json, error: r.ok ? null : ((r.json && (r.json.message || r.json.error)) || ('HTTP ' + r.status)) };
+  }
+  async function wsFn(body){
+    if(!(me && me.ws && me.ws.tok)) return { ok: false, error: 'no_ws' };
+    const r = await jf(WS_URL + '/functions/v1/create-user', { method: 'POST', headers: { apikey: WS_KEY, Authorization: 'Bearer ' + me.ws.tok, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const ok = r.ok && r.json && !r.json.error;
+    return { ok: ok, json: r.json, error: ok ? null : ((r.json && (r.json.error || r.json.message)) || ('HTTP ' + r.status)) };
+  }
+  async function wsLoad(){
+    const out = { canWrite: !!(me && me.ws && me.ws.tok && me.ws.canManage), deptId: {}, byLogin: {} };
+    if(!out.canWrite) return out;
+    const d = await wsApi('departments_list'), u = await wsApi('users_list');
+    if(!d.ok || !u.ok){ out.canWrite = false; out.err = d.error || u.error; return out; }
+    (d.json || []).forEach(function(x){ out.deptId[x.code] = x.id; });
+    (u.json || []).forEach(function(x){ out.byLogin[(x.email || '').split('@')[0]] = x; });
+    return out;
+  }
+  function wsText(e){ return /jwt|expired|401/i.test(String(e)) ? 'your CP WORKSPACE sign-in has expired. Log out and sign in again' : String(e); }
   function errText(r){ return r.error === 'network' ? 'Could not reach the service. Try again.' : (ADMIN_ERR[r.error] || 'Could not save (' + r.error + ').'); }
 
   function nxuStyle(){
@@ -806,6 +829,7 @@ var NEXUS_CONFIG={portals:[],departments:[]};
     wrap.textContent = '';
     if(!data.ok){ wrap.appendChild(mk('p', 'nxu-note err', data.error === 'not_allowed' ? 'Only administrators can open this. Sign in with your username (not the old department password).' : errText(data))); return; }
     const roles = data.roles, users = data.users;
+    const WS = await wsLoad();
     const activeRoles = roles.filter(function(r){ return r.active; });
     const roleName = {}; roles.forEach(function(r){ roleName[r.role_id] = r.name; });
     function roleSelect(sel, withAll){
@@ -866,14 +890,30 @@ var NEXUS_CONFIG={portals:[],departments:[]};
         if(!r.ok){ box.insertBefore(note(errText(r), true), box.firstChild); return; }
         if(!r.created){ box.insertBefore(note('That username already exists. Find it in the list and edit it there.', true), box.firstChild); return; }
         const uname = nu.value.trim().toLowerCase();
-        await refresh(note('Added ' + uname + '. Temporary password (shown once, give it privately):', false, tmp));
+        let extra = '';
+        if(!WS.canWrite){ extra = ' CP WORKSPACE login NOT created: sign in with a CP WORKSPACE administrator login to create both together.'; }
+        else {
+          const code = WS_CODE_FOR_NX[nr.value], did = WS.deptId[code];
+          if(!did){ extra = ' CP WORKSPACE login NOT created: this department does not exist in CP WORKSPACE yet.'; }
+          else if(WS.byLogin[uname]){ extra = ' (This person already had a CP WORKSPACE login, kept as it is.)'; }
+          else {
+            const w = await wsFn({ module: 'none', login_id: uname, full_name: nn.value.trim() || uname, department_id: did, password: tmp });
+            if(!w.ok){
+              await adminCall('nexus_admin_delete_user', { p_username: uname });
+              await refresh(note('Not added. CP WORKSPACE said: ' + wsText(w.error) + '. Nothing was created in either system.', true));
+              return;
+            }
+            extra = ' Created in CP WORKSPACE and CP NEXUS with the same password.';
+          }
+        }
+        await refresh(note('Added ' + uname + '.' + extra + ' Temporary password (shown once, give it privately):', false, tmp));
       });
 
       if(noteEl) box.insertBefore(noteEl, box.firstChild);
       wrap.appendChild(box);
 
       const tw = mk('div', 'nxu-tw'); const tbl = mk('table', 'nxu-tbl');
-      const hr = mk('tr'); ['Person', 'Display name', 'Department', 'Can open', 'Status', 'Last sign-in', 'Actions'].forEach(function(h){ hr.appendChild(mk('th', '', h)); });
+      const hr = mk('tr'); ['Person', 'Display name', 'Department', 'Can open', 'CP WORKSPACE login', 'Status', 'Last sign-in', 'Actions'].forEach(function(h){ hr.appendChild(mk('th', '', h)); });
       const th = mk('thead'); th.appendChild(hr); tbl.appendChild(th);
       const tb = mk('tbody'); tbl.appendChild(tb); tw.appendChild(tbl); wrap.appendChild(tw);
       const empty = mk('p', 'nxu-hint', 'No one matches. Change the search or filters.'); empty.style.display = 'none'; empty.style.marginTop = '12px'; wrap.appendChild(empty);
@@ -902,7 +942,16 @@ var NEXUS_CONFIG={portals:[],departments:[]};
           save.disabled = true; save.textContent = 'Saving…';
           const r = await adminCall('nexus_admin_save_user', { p_username: u.username, p_display_name: name.value, p_role_id: rs.value, p_active: acb.checked, p_password: null });
           if(!r.ok){ save.textContent = 'Save'; save.disabled = false; box.insertBefore(note(errText(r), true), box.firstChild); return; }
-          await refresh(note('Saved changes for ' + u.username + '.', false));
+          let msg = 'Saved changes for ' + u.username + '.';
+          const wu = WS.byLogin[u.username];
+          if(wu && WS.canWrite){
+            const did = WS.deptId[WS_CODE_FOR_NX[rs.value]];
+            if(did){
+              const w = await wsApi('user_update', { p_user_id: wu.user_id, p_full_name: name.value, p_department_id: did, p_active: acb.checked });
+              msg += w.ok ? ' Also updated in CP WORKSPACE.' : ' CP WORKSPACE NOT updated: ' + wsText(w.error) + '.';
+            } else msg += ' CP WORKSPACE not updated: department not found there.';
+          }
+          await refresh(note(msg, false));
         });
         let rarmed = false;
         rp.addEventListener('click', async function(){
@@ -910,17 +959,26 @@ var NEXUS_CONFIG={portals:[],departments:[]};
           const tmp = randomPassword();
           const r = await adminCall('nexus_admin_save_user', { p_username: u.username, p_display_name: name.value, p_role_id: rs.value, p_active: acb.checked, p_password: tmp });
           if(!r.ok){ box.insertBefore(note(errText(r), true), box.firstChild); return; }
-          await refresh(note('New temporary password for ' + u.username + ' (shown once; they must change it at next sign-in):', false, tmp));
+          let wmsg = '';
+          const wu = WS.byLogin[u.username];
+          if(wu && WS.canWrite){ const w = await wsFn({ action: 'reset_password', user_id: wu.user_id, password: tmp }); wmsg = w.ok ? ' Same password set in CP WORKSPACE.' : ' CP WORKSPACE password NOT changed: ' + wsText(w.error) + '.'; }
+          await refresh(note('New temporary password for ' + u.username + wmsg + ' (shown once; they must change it at next sign-in):', false, tmp));
         });
         let darmed = false;
         del.addEventListener('click', async function(){
           if(!darmed){ darmed = true; del.textContent = 'Click again to confirm'; setTimeout(function(){ darmed = false; del.textContent = 'Delete'; }, 4000); return; }
           const r = await adminCall('nexus_admin_delete_user', { p_username: u.username });
           if(!r.ok){ box.insertBefore(note(errText(r), true), box.firstChild); return; }
-          await refresh(note('Deleted ' + u.username + '.', false));
+          let dmsg = '';
+          const wu = WS.byLogin[u.username];
+          if(wu && WS.canWrite){ const w = await wsFn({ action: 'delete_user', user_id: wu.user_id }); dmsg = w.ok ? ' Also deleted from CP WORKSPACE.' : ' CP WORKSPACE login NOT deleted: ' + wsText(w.error) + '.'; }
+          await refresh(note('Deleted ' + u.username + '.' + dmsg, false));
         });
         const cOpen = mk('td'); cOpen.appendChild(wsChips(roleName[u.role_id] || '', true)); rs.addEventListener('change', function(){ cOpen.textContent=''; cOpen.appendChild(wsChips(roleName[rs.value] || '', true)); });
-        [c1, c2, c3, cOpen, c4, c5, c6].forEach(function(c){ tr.appendChild(c); });
+        const cWs = mk('td'); const hasWs = !!WS.byLogin[u.username];
+        if(!WS.canWrite) cWs.appendChild(mk('span', 'sub', 'Not checked'));
+        else cWs.appendChild(mk('span', 'nxu-pill ' + (hasWs ? 'on' : 'off'), hasWs ? 'Has login' : 'Missing'));
+        [c1, c2, c3, cOpen, cWs, c4, c5, c6].forEach(function(c){ tr.appendChild(c); });
         tb.appendChild(tr);
         rows.push({ tr: tr, u: u, name: name, rs: rs, acb: acb });
       });
