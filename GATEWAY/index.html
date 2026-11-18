@@ -1145,7 +1145,7 @@ var NEXUS_CONFIG={portals:[],departments:[]};
     const TG_DEP_IC = { administrator: '👑', manager: '🧭', ceo: '🎖️', hr_admin: '👥', production: '🏭', scm: '📦', engineering: '🔧', maintenance: '🛠️', security: '💂', quality: '✅' };
     const TG_TILE_IC = { pms: '🏭', payroll: '💰', quality: '✅', tincost: '🧮', pf_esi: '🛡️', cp_portal: '🌐', eng_worklog: '🛠️', requisition: '📝', approvals: '✔️', security_tracking: '🚧', ip_security: '🔒' };
     /* Tile details: name, link, show/hide and new tiles for both systems (view only inside each system) */
-    function tileDetails(holder, nxAll, wsAll, nxOk){
+    function tileDetails(holder, nxAll, wsAll, nxOk, nxLinks){
       const card = mk('div', 'tg-card'); card.style.padding = '16px'; card.style.marginTop = '18px';
       card.appendChild(mk('h3', null, 'Tile details'));
       card.appendChild(mk('p', 'nxu-hint', 'Change a tile name, link or show/hide here. CP WORKSPACE and CP NEXUS only display it. Tiles are hidden, not deleted.'));
@@ -1169,7 +1169,7 @@ var NEXUS_CONFIG={portals:[],departments:[]};
         return r;
       }
       if(nxOk) nxAll.forEach(function(p){
-        card.appendChild(row('nx', 'CP NEXUS', p.title, p.subtitle, '', p.active !== false, async function(v){
+        card.appendChild(row('nx', 'CP NEXUS', p.title, p.subtitle, nxLinks[p.portal_id] || '', p.active !== false, async function(v){
           const r1 = await jf(NX_URL + '/rest/v1/nexus_portals?portal_id=eq.' + encodeURIComponent(p.portal_id), { method: 'PATCH', headers: nh({ Prefer: 'return=representation' }), body: JSON.stringify({ title: v.title, subtitle: v.sub, active: v.active, updated_at: new Date().toISOString(), updated_by: (me && me.login) || 'gateway' }) });
           if(!r1.ok || !Array.isArray(r1.json) || !r1.json.length) return 'CP NEXUS refused the change';
           if(v.url){ const r2 = await jf(NX_URL + '/rest/v1/portal_links?on_conflict=portal_id', { method: 'POST', headers: nh({ Prefer: 'resolution=merge-duplicates,return=minimal' }), body: JSON.stringify({ portal_id: p.portal_id, url: v.url, updated_at: new Date().toISOString() }) }); if(!r2.ok) return 'name saved, link refused'; }
@@ -1220,6 +1220,8 @@ var NEXUS_CONFIG={portals:[],departments:[]};
       (async function(){
         const nxr = await jf(NX_URL + '/rest/v1/nexus_portals?select=*&order=sort_order', { headers: { apikey: NX_KEY, Authorization: 'Bearer ' + NX_KEY } });
         const wsr = WS.canWrite ? await wsApi('portal_links_list') : { ok: false, json: [] };
+        const lkr = await jf(NX_URL + '/rest/v1/portal_links?select=portal_id,url', { headers: { apikey: NX_KEY, Authorization: 'Bearer ' + NX_KEY } });
+        const nxLinkMap = {}; if(lkr.ok && Array.isArray(lkr.json)) lkr.json.forEach(function(r){ if(r.url) nxLinkMap[r.portal_id] = r.url; });
         holder.textContent = '';
         const nxTiles = (nxr.ok && Array.isArray(nxr.json) ? nxr.json : []).filter(function(r){ return r.active !== false && r.portal_id !== 'portal_links'; });
         const wsTiles = (wsr.ok && Array.isArray(wsr.json) ? wsr.json : []).filter(function(r){ return r.active !== false; });
@@ -1275,7 +1277,7 @@ var NEXUS_CONFIG={portals:[],departments:[]};
         const foot = mk('div', 'tg-foot'); const save = mk('button', 'nxu-btn', '💾 Save tiles'); save.type = 'button'; save.disabled = true;
         const undo = mk('button', 'nxu-btn ghost', '↺ Undo changes'); undo.type = 'button';
         foot.appendChild(save); foot.appendChild(undo); foot.appendChild(mk('span', 'sub', 'Saving updates both systems at once. Only Administrator and Manager see this tab.')); holder.appendChild(foot);
-        tileDetails(holder, (nxr.ok && Array.isArray(nxr.json) ? nxr.json : []).filter(function(r){ return r.portal_id !== 'portal_links'; }), (wsr.ok && Array.isArray(wsr.json) ? wsr.json : []), nxr.ok);
+        tileDetails(holder, (nxr.ok && Array.isArray(nxr.json) ? nxr.json : []).filter(function(r){ return r.portal_id !== 'portal_links'; }), (wsr.ok && Array.isArray(wsr.json) ? wsr.json : []), nxr.ok, nxLinkMap);
         function dirtyChk(){ save.disabled = JSON.stringify(state) === snap; }
         undo.addEventListener('click', function(){ go('access'); });
         save.addEventListener('click', async function(){
