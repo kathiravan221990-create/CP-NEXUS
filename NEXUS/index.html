@@ -1873,10 +1873,11 @@ function decodeEmbeddedHtml(b64){
         const wrap = el('div', 'plink-actions'); wrap.style.flexWrap = 'wrap';
         deptList.forEach(function(d){
           const lab = el('label', 'plink-hint'); lab.style.marginRight = '12px';
-          const cb = el('input'); cb.type = 'checkbox'; cb.value = d.id; cb.checked = selected.indexOf(d.id) !== -1;
+          const cb = el('input'); cb.type = 'checkbox'; cb.value = d.id; cb.checked = selected.indexOf(d.id) !== -1; cb.disabled = true; /* view only: set in Gateway of CP */
           lab.appendChild(cb); lab.appendChild(document.createTextNode(' ' + d.name));
           wrap.appendChild(lab);
         });
+        box.appendChild(el('div', 'plink-hint', 'Who sees this tile: view only. Change it in Gateway of CP.'));
         box.appendChild(wrap);
         return function(){ return Array.prototype.map.call(wrap.querySelectorAll('input:checked'), function(c){ return c.value; }); };
       }
