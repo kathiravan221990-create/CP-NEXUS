@@ -573,6 +573,14 @@ function render(){
     g4.appendChild(gtile(IC.ws.plinks||IC.ws.ipsec,"PORTAL LINKS","",function(){openPortalLinks();}));
   }
   waterStart(); filterTiles();
+  /* pop-up when one of the two systems did not load for this sign-in */
+  if((!ws||!nx)&&!me.warned){ me.warned=true; var miss=!ws?"CP WORKSPACE":"CP NEXUS";
+    var pm=document.createElement("div"); pm.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10000;display:flex;align-items:center;justify-content:center";
+    pm.innerHTML='<div style="background:#14213a;border:1px solid rgba(255,224,140,.55);border-radius:16px;padding:24px;width:min(460px,92vw);color:#fff;text-align:center"><h3 style="margin:0 0 8px;color:#ffe08c"></h3><p style="margin:0 0 16px;line-height:1.5;font-size:15px"></p><button type="button" class="btn" style="margin:0 6px 6px">Log Out and sign in again</button><button type="button" class="btn" style="margin:0 6px 6px;background:transparent;border:1px solid rgba(255,224,140,.5);color:#ffe08c">Continue</button></div>';
+    pm.querySelector("h3").textContent=miss+" is not available";
+    pm.querySelector("p").textContent=miss+" did not open with this sign-in. Please press Log Out and sign in again. If it still shows, tell the Administrator.";
+    var bs=pm.querySelectorAll("button"); bs[0].onclick=function(){pm.remove();$("out").click();}; bs[1].onclick=function(){pm.remove();};
+    document.body.appendChild(pm); }
   var a=$("alert");
   if(mismatch){ a.textContent="Department check: your department in CP WORKSPACE ("+ws.dept+") does not match your role in CP NEXUS ("+(nx.roleName||nx.role)+"). Please tell the Administrator."; show(a,true);} else show(a,false);
 }
