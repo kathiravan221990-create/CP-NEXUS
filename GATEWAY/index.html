@@ -592,7 +592,7 @@ function openPortalLinks(){
     document.body.appendChild(m); document.getElementById("plClose").onclick=function(){m.style.display="none";};}
   document.getElementById("plWs").value=WS_APP; document.getElementById("plNx").value=NX_APP; m.style.display="flex";
 }
-$("out").onclick=function(){bellStop();signOutAll();gwClear();me=null;fails=0;$("u").value="";$("p").value="";$("dd").value="";show($("home"),false);show($("login"),true);waterStart();};
+$("out").onclick=function(){try{sessionStorage.removeItem("cp_ip_asked");}catch(e){} bellStop();signOutAll();gwClear();me=null;fails=0;$("u").value="";$("p").value="";$("dd").value="";show($("home"),false);show($("login"),true);waterStart();};
 $("form").onsubmit=function(e){
   e.preventDefault(); var er=$("err"), btn=e.target.querySelector(".btn");
   if(locked){er.textContent="Too many wrong attempts. Please wait 15 minutes and try again.";show(er,true);return;}
@@ -619,7 +619,7 @@ $("form").onsubmit=function(e){
     var dn=me.ws?me.ws.dept:(NX_DEPT_NAME[me.nx.role]||me.nx.roleName||me.nx.role); $("dd").value=dn||"";
     btn.disabled=true; btn.textContent="Welcome, "+(((me.ws&&me.ws.name)||(me.nx&&me.nx.name)||me.login)+"").split(" ")[0];
     waterDrop(innerWidth/2,innerHeight/2,true);
-    setTimeout(function(){ btn.disabled=false; btn.textContent="Sign in"; show($("login"),false); show($("home"),true); render(); bellStart();
+    setTimeout(function(){ btn.disabled=false; btn.textContent="Sign in"; show($("login"),false); show($("home"),true); render(); bellStart(); setTimeout(ipCheckPrompt,600);
       if((me.ws&&me.ws.must)||(me.nx&&me.nx.must)) openPw(true); },REDUCED?0:900);
   });
 };
@@ -668,7 +668,7 @@ function gwRestore(){
     /* if a saved side has expired (the app it opened may have used up its one-time refresh), do not show it as Not available: ask for a fresh sign-in */
     if((raw.ws&&!r[0])||(raw.nx&&!r[1])||(!r[0]&&!r[1])){gwClear();return;}
     me={login:raw.login,ws:r[0],nx:r[1]}; gwSave();
-    show($("login"),false); show($("home"),true); render(); bellStart();
+    show($("login"),false); show($("home"),true); render(); bellStart(); setTimeout(ipCheckPrompt,600);
   });
 }
 function openFs(title,sub){ $("fsT").textContent=title; $("fsS").textContent=sub; $("fsBody").innerHTML=""; show($("fs"),true); document.body.style.overflow="hidden"; }
@@ -1607,6 +1607,37 @@ const btnIpSec = document.getElementById('btnIpSec');
     var now=Date.now();
     out.rows=Object.keys(map).map(function(k){return map[k];}).filter(function(r){ return r.kind!=='temporary'||!r.exp||new Date(r.exp).getTime()>now; });
     return out;
+  }
+
+  /* IP-SECURITY prompt: for an Administrator or Manager (who can always sign in), tell them when their current network is not on the allowed list */
+  function ipInList(ip,rows){
+    function n(a){var x=String(a).split('.');return x.length===4?(((+x[0]*256+ +x[1])*256+ +x[2])*256+ +x[3]):null;}
+    return rows.some(function(r){ var c=String(r.ip); if(c===ip) return true; if(c.indexOf('/')>0){ var pr=c.split('/'),b=+pr[1],a1=n(pr[0]),a2=n(ip); if(a1!==null&&a2!==null&&b>=0&&b<=32){ var m=b===0?0:Math.pow(2,32-b); return Math.floor(a1/m)===Math.floor(a2/m);} } return false; });
+  }
+  async function ipCheckPrompt(){
+    try{
+      if(!me||!ipCanEdit()) return;
+      var key="cp_ip_asked"; try{ if(sessionStorage.getItem(key)) return; }catch(e){}
+      var d=await ipLoad(); if(!(d.nxOn===true||d.wsOn===true)) return;
+      var ip=d.myIp; if(!ip){ try{ var x=await jf("https://api.ipify.org?format=json",{cache:"no-store"}); ip=x.json&&x.json.ip; }catch(e){} }
+      if(!ip||!d.rows.length||ipInList(ip,d.rows)) return;
+      try{ sessionStorage.setItem(key,"1"); }catch(e){}
+      var defs=d.rows.filter(function(r){return r.kind==="default";});
+      var pm=document.createElement("div"); pm.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:10000;display:flex;align-items:center;justify-content:center";
+      pm.innerHTML='<div style="background:#14213a;border:1px solid rgba(255,224,140,.55);border-radius:16px;padding:24px;width:min(520px,94vw);color:#fff"><h3 style="margin:0 0 8px;color:#ffe08c">This network is not on the allowed list</h3><p class="pmT" style="margin:0 0 14px;line-height:1.5;font-size:15px"></p><div class="pmB"></div><p class="pmM" style="margin:10px 0 0;font-size:13px;color:#9fe6b4"></p></div>';
+      pm.querySelector(".pmT").innerHTML="IP Security is ON. You can sign in because you are an Administrator or Manager, but other people cannot sign in from <b>"+ipEsc(ip)+"</b>. What would you like to do?";
+      var box=pm.querySelector(".pmB"), msg=pm.querySelector(".pmM");
+      function btn(t,fn,ghost){ var b=document.createElement("button"); b.type="button"; b.className="btn"; b.style.cssText="margin:0 6px 8px 0"+(ghost?";background:transparent;border:1px solid rgba(255,224,140,.5);color:#ffe08c":""); b.textContent=t; b.onclick=fn; box.appendChild(b); return b; }
+      async function run(label,fnWork){ box.querySelectorAll("button").forEach(function(b){b.disabled=true;}); msg.style.color="#9fe6b4"; msg.textContent="Saving..."; var e=await fnWork(); if(e.length){ msg.style.color="#ff9a9a"; msg.textContent=e.join(" | "); box.querySelectorAll("button").forEach(function(b){b.disabled=false;}); } else { msg.textContent=label+" Saved in CP NEXUS and CP WORKSPACE."; setTimeout(function(){pm.remove();},1600); } }
+      btn("Add as Temporary (6 hours)",function(){ run("Added as a temporary IP.",function(){return ipAdd(ip,"Added at sign-in",true);}); });
+      btn("Add as Default",function(){ run("Added as a default IP.",function(){return ipAdd(ip,"Added at sign-in",false);}); });
+      if(defs.length){
+        var sel=document.createElement("select"); sel.style.cssText="margin:0 6px 8px 0;padding:10px;border-radius:10px;max-width:100%"; defs.forEach(function(r,i){ var o=document.createElement("option"); o.value=i; o.textContent="Replace "+r.ip+(r.label?" ("+r.label+")":""); sel.appendChild(o); }); box.appendChild(sel);
+        btn("Replace it",function(){ var row=defs[+sel.value]; if(!confirm("Replace "+row.ip+" with "+ip+"?\n\nPeople on the old network will no longer be able to sign in.")) return; run("Replaced.",async function(){ var e1=await ipAdd(ip,row.label||"Replaced at sign-in",false); if(e1.length) return e1; return await ipRemove(row); }); });
+      }
+      btn("Not now",function(){ pm.remove(); },true);
+      document.body.appendChild(pm);
+    }catch(e){}
   }
   async function ipAdd(ip,label,temp){
     var res=[];
