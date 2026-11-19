@@ -626,9 +626,10 @@ function signOutAll(keepHanded){
 }
 /* stay signed in until Log Out is pressed: the session is kept in this browser and checked again on return */
 var GW_KEY="cp_gw_session";
-function gwSave(){try{localStorage.setItem(GW_KEY,JSON.stringify({login:me.login,ws:me.ws,nx:me.nx}));}catch(e){}}
+function gwSave(){/* no longer kept: every visit to the Gateway asks for a fresh sign-in */}
 function gwClear(){try{localStorage.removeItem(GW_KEY);}catch(e){}}
 function gwRestore(){
+  gwClear(); return; /* stay-signed-in removed: always start at the login page */
   var raw=null; try{raw=JSON.parse(localStorage.getItem(GW_KEY)||"null");}catch(e){}
   if(!raw||!raw.login||(!raw.ws&&!raw.nx)){gwClear();return;}
   var wsP=Promise.resolve(null), nxP=Promise.resolve(null);
