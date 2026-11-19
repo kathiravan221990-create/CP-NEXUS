@@ -649,7 +649,8 @@ function gwRestore(){
     }).catch(function(){return null;});
   }
   Promise.all([wsP,nxP]).then(function(r){
-    if(!r[0]&&!r[1]){gwClear();return;}
+    /* if a saved side has expired (the app it opened may have used up its one-time refresh), do not show it as Not available: ask for a fresh sign-in */
+    if((raw.ws&&!r[0])||(raw.nx&&!r[1])||(!r[0]&&!r[1])){gwClear();return;}
     me={login:raw.login,ws:r[0],nx:r[1]}; gwSave();
     show($("login"),false); show($("home"),true); render(); bellStart();
   });
