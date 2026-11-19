@@ -422,6 +422,7 @@ function wsCheck(login,pw){
     var tok=a.json.access_token, rtok=a.json.refresh_token||"";
     var H2={apikey:WS_KEY,Authorization:"Bearer "+tok,"Content-Type":"application/json","Content-Profile":"core_api","Accept-Profile":"core_api"};
     return jf(WS_URL+"/rest/v1/rpc/me",{method:"POST",headers:H2,body:"{}"}).then(function(m){
+      if(m.status===403){ fetch(WS_URL+"/auth/v1/logout",{method:"POST",headers:{apikey:WS_KEY,Authorization:"Bearer "+tok}}).catch(function(){}); return {ipBlocked:true}; }
       if(!m.ok||!m.json) return null;
       return jf(WS_URL+"/rest/v1/rpc/portal_links_list",{method:"POST",headers:H2,body:"{}"}).then(function(l){
         var dept=m.json.department||{}; var tiles=[];
@@ -600,6 +601,13 @@ $("form").onsubmit=function(e){
   btn.disabled=true; btn.textContent="Checking...";
   Promise.all([wsCheck(login,pw),nxCheck(login,pw)]).then(function(r){
     btn.disabled=false; btn.textContent="Sign in";
+    if(r[0]&&r[0].ipBlocked){
+      /* the password is right but this network is not on the allowed list: say so clearly and do not sign in */
+      if(r[1]&&r[1].token) fetch(NX_URL+"/rest/v1/rpc/nexus_logout",{method:"POST",headers:NX_H(),body:JSON.stringify({p_token:r[1].token})}).catch(function(){});
+      er.textContent="Sign-in is not allowed from this network."; show(er,true);
+      fetch("https://api.ipify.org?format=json",{cache:"no-store"}).then(function(x){return x.json()}).then(function(j){ er.textContent="Sign-in is not allowed from this network (your IP: "+j.ip+"). Please ask the Administrator to allow it, or sign in from the office network."; }).catch(function(){ er.textContent="Sign-in is not allowed from this network. Please ask the Administrator to allow it, or sign in from the office network."; });
+      return;
+    }
     if(!r[0]&&!r[1]){
       fails++;
       if(fails>=5){ locked=true; er.textContent="Too many wrong attempts. Please wait 15 minutes and try again."; setTimeout(function(){locked=false;fails=0;},15*60*1000); }
