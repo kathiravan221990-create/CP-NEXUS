@@ -544,6 +544,10 @@ function applyClosure(t,f){
     t.machineImg=f.machineImg||null;t.docImg=f.docImg||null;
     if('invoiceDoc' in f)t.invoiceDoc=f.invoiceDoc||null;
 }
+/* ticket numbers: the unit code NCPL is shown as RKT (stored code unchanged, so old tickets are not disturbed) */
+const dno=n=>String(n==null?'':n).replace(/^NCPL-/,'RKT-');
+/* Self TT: raised by the Engineering team itself (on behalf of a unit) - no confirmation, only Save & Close */
+const isSelf=t=>!!t&&t.raisedByRole==='engineering';
 function isRaiser(t,u){return !!u&&(t.raisedBy===u.email||(/@demo\.com$/.test(t.raisedBy||'')&&t.raisedByRole===u.role&&(!u.company||u.company===t.company)))}
 const API={
   options(co,key){return DB.options[co][key]},
@@ -642,6 +646,7 @@ const API={
   },
   sendConfirm(id,f,user){
     const t=guard(id,'running',user,'engineering');
+    if(isSelf(t))throw new Error('This is a Self TT raised by the Engineering team. It does not need confirmation - use Save & Close.');
     applyClosure(t,f);
     t.status='confirm';t.confirmAt=Date.now();t.closedBy=user.name;
     t.history.push({at:Date.now(),by:user.name,act:'Sent for confirmation to '+t.raisedByName});
@@ -932,7 +937,7 @@ function pageRaise(p){
   if(!S.draft)S.draft=newDraft();
   const ed=S.draft.editId;
   p.innerHTML=`<div class="panel">
-    <div class="ph"><h2>${ed?'Edit Ticket '+esc(find(ed).no)+(S.draft.admin?' <span class="muted" style="font-size:11px">(manager edit — status unchanged)</span>':''):'New Ticket'}</h2><span class="muted mono" style="font-size:11px">${ed?'':'Stamped on submit: '}<span id="f-now">${ed?'':fmtDT(Date.now())}</span></span></div>
+    <div class="ph"><h2>${ed?'Edit Ticket '+esc(dno(find(ed).no))+(S.draft.admin?' <span class="muted" style="font-size:11px">(manager edit — status unchanged)</span>':''):'New Ticket'}</h2><span class="muted mono" style="font-size:11px">${ed?'':'Stamped on submit: '}<span id="f-now">${ed?'':fmtDT(Date.now())}</span></span></div>
     <div class="grid">
       <div class="step"><label class="lb">Location <i>*</i></label><select id="f-company"></select></div>
       ${dd('dept','Concern Department')}
@@ -1017,7 +1022,7 @@ function flow(){
   const rbox=$('f-repeat');
   if(sparesReady&&(d.noSpare||d.spares.length)&&d.process){
     const pv=prevClosed(Object.assign({id:d.editId||'new'},cleanDraft(d),{raisedAt:Date.now()}));
-    rbox.innerHTML=pv?`<div class="prev">🔁 <b>Repeat issue.</b> The same item was closed on ${fmtDT(pv.closedAt)} (${esc(pv.no)}). Previous action: ${esc(pv.solution.action)} — Result: ${esc(pv.solution.result)}</div>`:'';
+    rbox.innerHTML=pv?`<div class="prev">🔁 <b>Repeat issue.</b> The same item was closed on ${fmtDT(pv.closedAt)} (${esc(dno(pv.no))}). Previous action: ${esc(pv.solution.action)} — Result: ${esc(pv.solution.result)}</div>`:'';
   }else rbox.innerHTML='';
   $('f-submit').disabled=missing(d).length>0;
 }
@@ -1063,7 +1068,7 @@ async function submitRaise(){
     if(CLOUD&&!d.editId){const b=$('f-submit');if(b)b.disabled=true;await fetchNextNo(d.company)}
     if(d.editId&&d.admin){API.adminEdit(d.editId,d,S.user);toast('Ticket details updated.');S.draft=null;S.page=d.back||'all';render();return}
     if(d.editId){API.update(d.editId,d,S.user);toast('Ticket updated'+(true?' and sent for approval.':'.'))}
-    else{const t=API.create(d,S.user);S.justRaised=t.no;toast('Ticket '+t.no+' raised — waiting for '+(t.lvl===2?'Manager + CEO approval.':'manager approval.'))}
+    else{const t=API.create(d,S.user);S.justRaised=dno(t.no);toast('Ticket '+dno(t.no)+' raised — waiting for '+(t.lvl===2?'Manager + CEO approval.':'manager approval.'))}
     S.draft=null;S.page='mine';render();
   }catch(err){toast(err.message);const b=$('f-submit');if(b)b.disabled=false}
 }
@@ -1094,7 +1099,7 @@ function card(t,actions,opts){
   const rep=prevClosed(t);
   let extra='';
   if(t.status==='denied')extra+=`<div class="prob" style="border-left:3px solid var(--bad)"><b>Denied by ${esc(t.decidedBy)}:</b> ${esc(t.denyReason)}</div>`;
-  if(opts.repeatInfo&&rep)extra+=`<div class="prev">🔁 <b>Repeat issue</b> — previously closed ${fmtDT(rep.closedAt)} (${esc(rep.no)}).<br>Previous action: ${esc(rep.solution.action)}<br>Result: ${esc(rep.solution.result)}</div>`;
+  if(opts.repeatInfo&&rep)extra+=`<div class="prev">🔁 <b>Repeat issue</b> — previously closed ${fmtDT(rep.closedAt)} (${esc(dno(rep.no))}).<br>Previous action: ${esc(rep.solution.action)}<br>Result: ${esc(rep.solution.result)}</div>`;
   if(t.rw&&t.status!=='closed'&&t.status!=='denied'){const lr=lastRound(t);extra+=`<div class="prob" style="border-left:3px solid #ff9f43"><b>Rework #${t.rw}</b> — sent back by ${esc(lr?lr.reasonBy:'')}: “${esc(t.reworkReason)}”${lr?`<br><span class="muted" style="font-size:11px">Previous round: spent ${money(lr.amount)} · invoice ${esc(lr.invType||'—')}${lr.invType==='Invoiceable'?' '+money(lr.invAmount):''} · quoted ${money(t.quoted)} · total spent so far ${money(spentSoFar(t))}</span>`:''}</div>`}
   if(t.status==='confirm')extra+=solBlock(t);
   let timer='';
@@ -1102,7 +1107,7 @@ function card(t,actions,opts){
   if(t.status==='approved')timer=`<span class="muted" style="font-size:11px">Waiting in lobby</span> ${clock(t.decidedAt,null,'w')}`;
   if(t.status==='running')timer=`<span class="muted" style="font-size:11px">Work in Progress · by ${esc(t.acceptedBy)}</span> ${clock(t.acceptedAt,null)}`;
   return `<div class="tk ${t.status}">
-    <div class="tkh"><span class="lamp ${t.status}"></span><b class="mono">${esc(t.no)}</b><span class="stp ${t.status}">${esc(stText(t))}</span>${t.rw?`<span class="rwb">REWORK #${t.rw}</span>`:''}${(t.lvl||1)===2?'<span class="l2b">LEVEL 2</span>':''}${rep?'<span class="rep">🔁 Repeat</span>':''}<span class="sp"></span><span class="muted mono" style="font-size:11px">${fmtDT(t.raisedAt)}</span></div>
+    <div class="tkh"><span class="lamp ${t.status}"></span><b class="mono">${esc(dno(t.no))}</b>${isSelf(t)?' <span class="l2b" style="background:#1d6f5b">SELF TT</span>':''}<span class="stp ${t.status}">${esc(stText(t))}</span>${t.rw?`<span class="rwb">REWORK #${t.rw}</span>`:''}${(t.lvl||1)===2?'<span class="l2b">LEVEL 2</span>':''}${rep?'<span class="rep">🔁 Repeat</span>':''}<span class="sp"></span><span class="muted mono" style="font-size:11px">${fmtDT(t.raisedAt)}</span></div>
     <div class="tkb">${detailRows(t)}</div>
     <div class="prob">${esc(t.problem)}${t.photo?`<div style="margin-top:8px"><span class="icrow">${thumbOf(t.photo,`data-act="viewimg" data-id="${t.id}" data-f="photo"`)}${icView(`data-act="viewimg" data-id="${t.id}" data-f="photo"`)}${icDl(`data-act="dlimg" data-id="${t.id}" data-f="photo"`)}</span></div>`:''}</div>
     ${extra}
@@ -1121,7 +1126,7 @@ function pageMine(p){
   list(l,t=>card(t,
     (t.status==='raised'&&!t.rw?icEdit(`data-act="edit" data-id="${t.id}"`)+icDel(`data-act="del" data-id="${t.id}"`):'')+
     (t.status==='denied'&&!t.rw?`<button class="btn sm" data-act="edit" data-id="${t.id}">Edit & Resubmit</button>`:'')),'You have no other open tickets. Use "Raise Ticket" to create one.')+
-    (closed.length?`<div class="panel"><div class="ph"><h2>Closed tickets (${closed.length})</h2></div>${closed.slice(0,8).map(t=>`<div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:12.5px;flex-wrap:wrap"><span class="lamp closed"></span><b class="mono">${esc(t.no)}</b><span>${esc(itemLabel(t))}</span><span class="sp"></span><span class="muted mono">${fmtDT(t.closedAt)}</span><button class="btn sm ghost" data-act="detail" data-id="${t.id}">Details</button></div>`).join('')}</div>`:'');
+    (closed.length?`<div class="panel"><div class="ph"><h2>Closed tickets (${closed.length})</h2></div>${closed.slice(0,8).map(t=>`<div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:12.5px;flex-wrap:wrap"><span class="lamp closed"></span><b class="mono">${esc(dno(t.no))}</b><span>${esc(itemLabel(t))}</span><span class="sp"></span><span class="muted mono">${fmtDT(t.closedAt)}</span><button class="btn sm ghost" data-act="detail" data-id="${t.id}">Details</button></div>`).join('')}</div>`:'');
 }
 function pageApprovals(p){
   const ceo=S.user.role==='ceo';
@@ -1155,11 +1160,11 @@ function pageProgress(p){
 /* ---------- Log ---------- */
 function logRows(){
   const f=S.logF,from=f.from?new Date(f.from).getTime():0,to=f.to?new Date(f.to).getTime()+864e5:Infinity,q=f.q.trim().toLowerCase();
-  return vis().filter(t=>(!f.status||t.status===f.status)&&(S.mode==='lite'||!f.nature||t.nature===f.nature)&&t.raisedAt>=from&&t.raisedAt<to&&(!q||(t.no+' '+itemLabel(t)+' '+t.problem+' '+(t.solution?(t.solution.text||(t.solution.action+' '+t.solution.result)):'')).toLowerCase().includes(q))).sort((a,b)=>(b.closedAt||b.decidedAt)-(a.closedAt||a.decidedAt));
+  return vis().filter(t=>(!f.status||t.status===f.status)&&(S.mode==='lite'||!f.nature||t.nature===f.nature)&&t.raisedAt>=from&&t.raisedAt<to&&(!q||(t.no+' '+dno(t.no)+' '+itemLabel(t)+' '+t.problem+' '+(t.solution?(t.solution.text||(t.solution.action+' '+t.solution.result)):'')).toLowerCase().includes(q))).sort((a,b)=>(b.closedAt||b.decidedAt)-(a.closedAt||a.decidedAt));
 }
 function ticketTable(arr,all){
   if(!arr.length)return '<div class="empty">No tickets found.</div>';
-  return `<table class="t"><thead><tr><th>No</th>${S.view==='ALL'?'<th>Company</th>':''}<th>Raised</th><th>Item</th><th>Status</th><th>Repair time</th><th></th><th></th></tr></thead><tbody>${arr.map(t=>`<tr><td class="mono">${esc(t.no)}</td>${S.view==='ALL'?`<td>${esc(cname(t.company))}</td>`:''}<td class="mono" style="white-space:nowrap">${fmtDT(t.raisedAt)}</td><td>${esc(itemLabel(t))}</td><td><span class="stp ${t.status}">${esc(stText(t))}</span></td><td class="mono">${t.status==='running'?clock(t.acceptedAt,null)+'':fmtDur(ms(t).repair)}</td><td>${prevClosed(t)?'<span class="rep">🔁</span>':''}</td><td style="white-space:nowrap">${tkIcons(t)}</td></tr>`).join('')}</tbody></table>`;
+  return `<table class="t"><thead><tr><th>No</th>${S.view==='ALL'?'<th>Company</th>':''}<th>Raised</th><th>Item</th><th>Status</th><th>Repair time</th><th></th><th></th></tr></thead><tbody>${arr.map(t=>`<tr><td class="mono">${esc(dno(t.no))}</td>${S.view==='ALL'?`<td>${esc(cname(t.company))}</td>`:''}<td class="mono" style="white-space:nowrap">${fmtDT(t.raisedAt)}</td><td>${esc(itemLabel(t))}</td><td><span class="stp ${t.status}">${esc(stText(t))}</span></td><td class="mono">${t.status==='running'?clock(t.acceptedAt,null)+'':fmtDur(ms(t).repair)}</td><td>${prevClosed(t)?'<span class="rep">🔁</span>':''}</td><td style="white-space:nowrap">${tkIcons(t)}</td></tr>`).join('')}</tbody></table>`;
 }
 function pageLog(p){
   const f=S.logF;
@@ -1219,7 +1224,7 @@ function exportTickets(arr,name,forceMode){const MD=forceMode||S.mode;
   const mn=v=>v==null?'':xlDur(v);
   const roundRow=(t,r)=>Object.assign({},t,{__lbl:'Rework round '+r.n+' — sent back',solution:r.solution,category:r.category,sparesUsed:r.sparesUsed,amount:r.amount,invType:r.invType,invAmount:r.invAmount,invoiceDoc:r.invoiceDoc,acceptedAt:r.acceptedAt,acceptedBy:r.acceptedBy,confirmAt:r.sentAt,closedAt:null,closedBy:r.by,decidedAt:null,decidedBy:'',roundAt:null,rounds:[],rw:r.n,feedback:'Sent back by '+r.reasonBy+': '+r.reason,confirmedBy:'',denyReason:''});
   const rows=arr.flatMap(t0=>[...(t0.rounds||[]).map(r=>roundRow(t0,r)),t0]).map(t=>{const m=ms(t),pv=t.__lbl?null:prevClosed(t),lite=t.mode==='lite',so=t.solution||{};return [
-    t.no,lite?'Lite':'Ultra',cname(t.company),t.__lbl||stText(t),fmtDT(t.raisedAt),t.raisedByName,t.dept,t.source||'',t.workType||'',t.quoted==null?'':t.quoted,lite?'':t.nature,t.job,t.comp,t.opNo,t.opName,t.machine,lite?'':(t.noSpare?'No spare needed':t.spares.join(', ')),t.process||'',t.problem,t.decidedBy||'',t.denyReason||'',t.acceptedBy||'',t.acceptedAt?fmtDT(t.acceptedAt):'',t.closedAt?fmtDT(t.closedAt):'',t.closedBy||'',t.category||'',
+    dno(t.no),lite?'Lite':'Ultra',cname(t.company),t.__lbl||stText(t),fmtDT(t.raisedAt),t.raisedByName,t.dept,t.source||'',t.workType||'',t.quoted==null?'':t.quoted,lite?'':t.nature,t.job,t.comp,t.opNo,t.opName,t.machine,lite?'':(t.noSpare?'No spare needed':t.spares.join(', ')),t.process||'',t.problem,t.decidedBy||'',t.denyReason||'',t.acceptedBy||'',t.acceptedAt?fmtDT(t.acceptedAt):'',t.closedAt?fmtDT(t.closedAt):'',t.closedBy||'',t.category||'',
     lite?(so.text||''):'',lite?'':(so.issue||''),lite?'':(so.action||''),lite?'':(so.result||''),t.sparesUsed||'',t.amount==null?'':t.amount,t.invType||'',t.invType==='Invoiceable'&&t.invAmount!=null?t.invAmount:'',t.invoiceDoc?'Yes':'',mn(m.approval),mn(m.response),mn(m.repair),mn(m.down),lite?'':(pv?'Yes':'No'),'Level '+(t.lvl||1),t.rw||0,t.confirmedBy||'',t.feedback||'']});
   const stamp=new Date().toISOString().slice(0,10);
   let HH=H,RR=rows;
@@ -1235,7 +1240,7 @@ const matchSt=(t,k)=>k==='rework'?(t.rw>0&&['raised','approved','running','confi
 const DNAME={raised:'Awaiting approval',approved:'In lobby',running:'Work in Progress',confirm:'Awaiting confirmation',rework:'Rework',closed:'Closed',denied:'Denied'};
 function dview(t){return `<button class="btn sm ghost" data-act="detail" data-id="${t.id}">View</button>`}
 function waitCell(t){return `<span class="tick mono" data-since="${sinceOf(t)}" data-until="">${fmtDur(Date.now()-sinceOf(t))}</span>`}
-function tkNo(t){return `<b>${esc(t.no)}</b>${t.rw?` <span class="rwb">REWORK #${t.rw}</span>`:''}${(t.lvl||1)===2?' <span class="l2b">L2</span>':''}`}
+function tkNo(t){return `<b>${esc(dno(t.no))}</b>${isSelf(t)?' <span class="l2b" style="background:#1d6f5b">SELF TT</span>':''}${t.rw?` <span class="rwb">REWORK #${t.rw}</span>`:''}${(t.lvl||1)===2?' <span class="l2b">L2</span>':''}`}
 function xpand(st,L){
   if(!L.length)return '<i>No tickets in this status for this unit.</i>';
   const sm=`<tr>`;let H,R;
@@ -1328,7 +1333,7 @@ function imgBlock(src,id,f,title){
 }
 function detailModal(id){
   const t=find(id);if(!t)return;const m=ms(t),pv=prevClosed(t);
-  openModal(`<h3>${esc(t.no)} <span class="stp ${t.status}" style="vertical-align:middle;margin-left:8px">${esc(stText(t))}</span>${pv?' <span class="rep">🔁 Repeat</span>':''}</h3>
+  openModal(`<h3>${esc(dno(t.no))} <span class="stp ${t.status}" style="vertical-align:middle;margin-left:8px">${esc(stText(t))}</span>${pv?' <span class="rep">🔁 Repeat</span>':''}</h3>
    <div class="ms">${esc(cname(t.company))} · raised ${fmtDT(t.raisedAt)}</div>
    <div class="tkb">${detailRows(t)}</div>
    <div class="prob">${esc(t.problem)}</div>${imgBlock(t.photo,t.id,'photo','Problem photo')}
@@ -1338,7 +1343,7 @@ function detailModal(id){
      ${t.invoiceDoc?`<div style="margin-top:10px"><div class="lb">Invoice file</div><span class="icrow">${thumbOf(t.invoiceDoc,`data-act="viewinv" data-id="${t.id}"`)}${icView(`data-act="viewinv" data-id="${t.id}"`)}${icDl(`data-act="dlinv" data-id="${t.id}"`)}</span></div>`:''}
      <div class="tkb" style="margin-top:10px"><div><div class="k">Invoice type</div><div class="v">${esc(t.invType||'—')}</div></div><div><div class="k">Invoice amount</div><div class="v">${t.invType==='Invoiceable'?money(t.invAmount):'—'}</div></div></div>
      ${imgBlock(t.machineImg,t.id,'machineImg','Machine / component image')}${imgBlock(t.docImg,t.id,'docImg','Document image')}`:''}
-   ${pv&&t.status!=='closed'?`<div class="prev">🔁 Previously closed ${fmtDT(pv.closedAt)} (${esc(pv.no)}). Action: ${esc(pv.solution.action)} — Result: ${esc(pv.solution.result)}</div>`:''}
+   ${pv&&t.status!=='closed'?`<div class="prev">🔁 Previously closed ${fmtDT(pv.closedAt)} (${esc(dno(pv.no))}). Action: ${esc(pv.solution.action)} — Result: ${esc(pv.solution.result)}</div>`:''}
    <div class="lb" style="margin-top:16px">Times</div>
    <div class="tkb"><div><div class="k">Approval</div><div class="v mono">${fmtDur(m.approval)}</div></div><div><div class="k">Response</div><div class="v mono">${fmtDur(m.response)}</div></div><div><div class="k">Repair</div><div class="v mono">${t.status==='running'?'running…':fmtDur(m.repair)}</div></div><div><div class="k">Total downtime</div><div class="v mono">${fmtDur(m.down)}</div></div></div>
    ${roundsHtml(t)}<div class="lb" style="margin-top:16px">Timeline</div><div class="tl">${t.history.map(h=>`<div><b>${esc(h.act)}</b> — ${esc(h.by)} · ${fmtDT(h.at)}${h.note?'<br>“'+esc(h.note)+'”':''}</div>`).join('')}</div>
@@ -1351,7 +1356,7 @@ function roundsHtml(t){
   return h}
 function confModal(id,rw){
   const t=find(id);
-  openModal(`<h3>${rw?'Send back for Rework':'Confirm & Close'} — ${esc(t.no)}</h3><div class="ms">${esc(itemLabel(t))}</div>${solBlock(t)}
+  openModal(`<h3>${rw?'Send back for Rework':'Confirm & Close'} — ${esc(dno(t.no))}</h3><div class="ms">${esc(itemLabel(t))}</div>${solBlock(t)}
    <div class="fr"><label class="lb">${rw?'What is still not fixed?':'Feedback'} <i style="color:var(--bad);font-style:normal">*</i></label><textarea id="cf-text" placeholder="${rw?'Explain what is still wrong…':'Is the problem fixed? Your feedback…'}"></textarea></div>
    <div class="hint">${rw?'The ticket goes back for approval ('+((t.lvl||1)===2?'Manager + CEO':'Manager')+') and then to Engineering as REWORK.':'Closing moves the ticket to the Log.'}</div>
    <div class="ma"><button class="btn ghost" data-act="closemodal">Cancel</button><button class="btn ${rw?'bad':'ok'}" id="cf-go" data-act="${rw?'rwgo':'confgo'}" data-id="${id}" disabled>${rw?'↻ Send for Rework':'✓ Confirm & Close'}</button></div>`);
@@ -1359,15 +1364,15 @@ function confModal(id,rw){
 }
 function denyModal(id){
   const t=find(id);
-  openModal(`<h3>Deny ${esc(t.no)}</h3><div class="ms">${esc(itemLabel(t))}</div><div class="fr"><label class="lb">Reason <i style="color:var(--bad);font-style:normal">*</i></label><textarea id="deny-reason" placeholder="Why is this ticket being denied?"></textarea></div><div class="ma"><button class="btn ghost" data-act="closemodal">Cancel</button><button class="btn bad" id="deny-go" data-act="denygo" data-id="${id}" disabled>Confirm Deny</button></div>`);
+  openModal(`<h3>Deny ${esc(dno(t.no))}</h3><div class="ms">${esc(itemLabel(t))}</div><div class="fr"><label class="lb">Reason <i style="color:var(--bad);font-style:normal">*</i></label><textarea id="deny-reason" placeholder="Why is this ticket being denied?"></textarea></div><div class="ma"><button class="btn ghost" data-act="closemodal">Cancel</button><button class="btn bad" id="deny-go" data-act="denygo" data-id="${id}" disabled>Confirm Deny</button></div>`);
   $('deny-reason').addEventListener('input',e=>$('deny-go').disabled=!e.target.value.trim());
 }
 function closeFormModal(id,edit){
   const t=find(id);S.closeDraft={id,edit:!!edit,invoiceDoc:edit?(t.invoiceDoc||null):null,lite:t.mode==='lite',issue:t.problem,action:'',result:'',sparesUsed:'',amount:'',machineImg:null,docImg:null};S.closing=false;
   const pv=prevClosed(t);
-  openModal(`<h3>${edit?'Edit Closed Ticket':'Save & Close'} — ${esc(t.no)}</h3><div class="ms">${esc(itemLabel(t))}${edit?' · closed '+fmtDT(t.closedAt):' · running '+clock(t.acceptedAt,null,'w')}</div>
+  openModal(`<h3>${edit?'Edit Closed Ticket':'Save & Close'} — ${esc(dno(t.no))}</h3><div class="ms">${esc(itemLabel(t))}${edit?' · closed '+fmtDT(t.closedAt):' · running '+clock(t.acceptedAt,null,'w')}</div>
    ${t.rw&&!edit?`<div class="prev" style="border-color:#ff9f43"><b>REWORK #${t.rw}</b> — ${esc(t.reworkReason)}. Spent so far in earlier rounds: ${money(spentSoFar(t))}. Enter only this round's work below.</div>`:''}
-   ${pv?`<div class="prev">🔁 Repeat issue — last time (${esc(pv.no)}): ${esc(pv.solution.action)} → ${esc(pv.solution.result)}</div>`:''}
+   ${pv?`<div class="prev">🔁 Repeat issue — last time (${esc(dno(pv.no))}): ${esc(pv.solution.action)} → ${esc(pv.solution.result)}</div>`:''}
    ${t.mode==='lite'?`<div class="prob" style="margin-top:12px"><b>Problem:</b> ${esc(t.problem)}</div>
    <div class="fr"><label class="lb">Category <i style="color:var(--bad);font-style:normal">*</i></label><select id="c-cat"><option value="">Select…</option>${CATS.map(c=>`<option>${c}</option>`).join('')}</select></div>
    <div class="fr"><label class="lb">Solution Given <i style="color:var(--bad);font-style:normal">*</i></label><textarea id="c-solution" placeholder="What was done to solve the problem…"></textarea></div>
@@ -1385,8 +1390,8 @@ function closeFormModal(id,edit){
    <div class="grid"><div class="fr"><label class="lb">Machine / Component — photo or document (optional)</label><div id="c-img-machineImg"></div><input type="file" id="c-file-machineImg" accept="${ACCEPT}" hidden><button class="btn sm ghost" data-act="pickclose" data-f="machineImg">📎 Upload</button></div>
    <div class="fr"><label class="lb">Document — PDF, image, screenshot, etc. (optional)</label><div id="c-img-docImg"></div><input type="file" id="c-file-docImg" accept="${ACCEPT}" hidden><button class="btn sm ghost" data-act="pickclose" data-f="docImg">📎 Upload</button></div></div>
    ${edit?`<div class="fr"><label class="lb">Invoice — PDF, image, screenshot, etc.</label><div id="c-invoice"></div><input type="file" id="c-file-invoice" accept="${ACCEPT}" hidden><button class="btn sm ghost" data-act="pickinvoice">📎 Upload Invoice</button></div>`:''}
-   <div class="hint">${edit?'Changes are saved on this closed ticket; its status stays Closed.':(t.mode==='lite'?'Solution Given must be filled before saving.':'Every field above must be filled before saving.')+' A ticket can only be saved once. "Send for Confirmation" asks the person who raised it to check the fix first.'}</div>
-   <div class="ma"><button class="btn ghost" data-act="closemodal">Cancel</button><button class="btn" id="c-save" data-act="${edit?'closeeditgo':'closego'}" data-id="${id}" disabled>${edit?'Save Changes':'Save & Close'}</button>${edit?'':`<button class="btn ok" id="c-conf" data-act="sendconf" data-id="${id}" disabled>Send for Confirmation</button>`}</div>`,true);
+   <div class="hint">${edit?'Changes are saved on this closed ticket; its status stays Closed.':(t.mode==='lite'?'Solution Given must be filled before saving.':'Every field above must be filled before saving.')+(isSelf(t)?' A ticket can only be saved once. This is a Self TT raised by the Engineering team, so it closes here with no confirmation.':' A ticket can only be saved once. "Send for Confirmation" asks the person who raised it to check the fix first.')}</div>
+   <div class="ma"><button class="btn ghost" data-act="closemodal">Cancel</button><button class="btn" id="c-save" data-act="${edit?'closeeditgo':'closego'}" data-id="${id}" disabled>${edit?'Save Changes':'Save & Close'}</button>${(edit||isSelf(t))?'':`<button class="btn ok" id="c-conf" data-act="sendconf" data-id="${id}" disabled>Send for Confirmation</button>`}</div>`,true);
   if($('c-issue')&&!edit)$('c-issue').value=t.problem;
   if(edit){
     const so=t.solution||{};$('c-cat').value=t.category||'';
@@ -1495,13 +1500,13 @@ document.addEventListener('click',e=>{
     case 'delinvoice':S.closeDraft.invoiceDoc=null;invRender();break;
     case 'viewinvdraft':viewDoc(S.closeDraft.invoiceDoc);break;
     case 'viewinv':{const t=find(id);if(t&&t.invoiceDoc)viewDoc(t.invoiceDoc);break}
-    case 'dlinv':{const t=find(id);if(t&&t.invoiceDoc)dlFile(t.invoiceDoc.data,t.no+'-invoice-'+t.invoiceDoc.name);break}
+    case 'dlinv':{const t=find(id);if(t&&t.invoiceDoc)dlFile(t.invoiceDoc.data,dno(t.no)+'-invoice-'+t.invoiceDoc.name);break}
     case 'pickclose':$('c-file-'+b.dataset.f).click();break;
     case 'delclose':S.closeDraft[b.dataset.f]=null;closeImgs();break;
     case 'detail':detailModal(id);break;
-    case 'dlticket':{const t=find(id);if(t)exportTickets([t],'ticket-'+t.no,t.mode==='lite'?'lite':'ultra');break}
+    case 'dlticket':{const t=find(id);if(t)exportTickets([t],'ticket-'+dno(t.no),t.mode==='lite'?'lite':'ultra');break}
     case 'viewimg':{const t=find(id);viewImg(t[b.dataset.f]);break}
-    case 'dlimg':{const t=find(id),dd=D(t[b.dataset.f]);if(dd)dlFile(dd.data,t.no+'-'+b.dataset.f+'-'+dd.name);break}
+    case 'dlimg':{const t=find(id),dd=D(t[b.dataset.f]);if(dd)dlFile(dd.data,dno(t.no)+'-'+b.dataset.f+'-'+dd.name);break}
     case 'pvclose':closePreview();break;
     case 'pvdl':{const dd=window.__pvDoc;if(dd)dlFile(dd.data,dd.name);break}
     case 'export':exportTickets(logRows(),'work-card-log');break;
