@@ -648,6 +648,7 @@ $("form").onsubmit=function(e){
 var NX_H=function(){return {apikey:NX_KEY,Authorization:"Bearer "+NX_KEY,"Content-Type":"application/json"}};
 var WS_H=function(tok){return {apikey:WS_KEY,Authorization:"Bearer "+tok,"Content-Type":"application/json","Content-Profile":"core_api","Accept-Profile":"core_api"}};
 function handoffUrl(title,url,openId){
+  url=url+(url.indexOf("?")<0?"?":"&")+"v="+Date.now(); /* always fetch the newest version of the app (browsers may keep a copy for up to 10 minutes) */
   /* one-time pass in the address #fragment (never sent to a server); the app reads it, stores it and clears it */
   try{
     if(title==="CP WORKSPACE"&&me&&me.ws&&me.ws.tok){ me.ws.handed=true; return url+"#gw="+encodeURIComponent(btoa(JSON.stringify({a:me.ws.tok,r:me.ws.rtok||""})))+(openId?"&open="+encodeURIComponent(openId):""); }
