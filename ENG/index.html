@@ -941,7 +941,7 @@ function pageRaise(p){
     <div class="ph"><h2>${ed?'Edit Ticket '+esc(dno(find(ed).no))+(S.draft.admin?' <span class="muted" style="font-size:11px">(manager edit — status unchanged)</span>':''):'New Ticket'}</h2><span class="muted mono" style="font-size:11px">${ed?'':'Stamped on submit: '}<span id="f-now">${ed?'':fmtDT(Date.now())}</span></span></div>
     <div class="grid">
       <div class="step"><label class="lb">Location <i>*</i></label><select id="f-company"></select></div>
-      ${dd('dept','Concern Department')}
+      ${dd('dept','Concern Department <span class="muted" style="font-size:10px;letter-spacing:.08em">🔒 AUTO</span>')}
       ${dd('nature','Work Nature')}
       ${dd('job','Job Name')}
       <div class="step" id="st-comp" hidden><label class="lb">Component <i>*</i></label><div class="opbtn" id="f-comp">${COMPONENTS.map(c=>`<button type="button" data-act="comp" data-v="${c}">${c}</button>`).join('')}</div></div>
@@ -978,7 +978,9 @@ function populate(){
   const d=S.draft,co=d.company;
   const cs=$('f-company');cs.innerHTML=COMPANIES.map(c=>`<option value="${c.code}"${c.code===co?' selected':''}>${esc(c.name)}</option>`).join('');
   cs.disabled=!(isMgr()||S.user.role==='engineering')||!!d.editId;
-  fill($('f-dept'),API.options(co,'dept'),d.dept,'Select department…');
+  /* every ticket goes to Engineering: the department is fixed (old tickets being edited keep theirs) */
+  if(!d.editId||!d.dept)d.dept='Engineering';
+  fill($('f-dept'),[d.dept],d.dept,'');$('f-dept').disabled=true;
   fill($('f-nature'),API.options(co,'nature'),d.nature,'Select work nature…');
   fill($('f-process'),API.options(co,'process'),d.process,'Select process…');
   fill($('f-job'),API.options(co,'job'),d.job,'Select job name…');
