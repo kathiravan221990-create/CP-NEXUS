@@ -2234,7 +2234,7 @@ async function nexusStart(tok){
   let u = null;
   try{ u = await nexusCheck(tok); }catch(e){ showNexusMsg('Could not verify your Nexus sign-in. Check your internet and reopen this tile.'); return; }
   if(!u){ showNexusMsg('Your Nexus session has ended. Please sign in again in CP NEXUS.'); return; }
-  const role = (u.role_id === 'hr_admin' || u.role_id === 'manager' || u.is_admin) ? 'admin' : (u.role_id === 'security') ? 'security' : null;
+  const role = (u.role_id === 'hr_admin' || u.role_id === 'manager' || u.is_admin) ? 'admin' : (u.role_id === 'security' || u.role_id === 'engineering' || u.role_id === 'maintenance') ? 'security' : null;
   if(!role){ showNexusMsg('Your role (' + (u.role_name || u.role_id) + ') is not set up for Security Tracking. Please ask your administrator.'); return; }
   NEXUS_USER = u; NEXUS_TOKEN = tok; sb = makeClient(tok);
   currentUser = { id: u.username, email: u.username }; currentRole = role; currentName = u.display_name || u.username;
@@ -2242,7 +2242,7 @@ async function nexusStart(tok){
     await store.serverClock(); await store.loadAll();
   }catch(e){ showNexusMsg('Could not load data: ' + (e.message || e)); return; }
   $('login-screen').style.display = 'none'; $('app').style.display = 'block';
-  $('role-label-sidebar').textContent = currentName + ' (' + (role === 'admin' ? 'Admin' : 'Security') + ')';
+  $('role-label-sidebar').textContent = currentName + ' (' + (role === 'admin' ? 'Admin' : (u.role_name || 'User')) + ')';
   $('demo-banner').style.display = 'none';
   document.querySelectorAll('.admin-col').forEach(e => e.style.display = isAdmin() ? '' : 'none');
   $('nav-backup').classList.toggle('hidden', !isAdmin());
