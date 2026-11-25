@@ -210,6 +210,8 @@ input:focus, select:focus, textarea:focus{outline:2px solid var(--brass);outline
 .tg-btn.active.out{background:var(--out-accent);border-color:var(--out-accent);}
 .toggle-label{font-size:9px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--slate);display:block;margin-bottom:6px;}
 .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;}
+.sec-title{font-family:'Fraunces',serif;font-weight:700;font-size:15px;color:var(--navy,#12213f);margin:22px 0 10px;padding:7px 12px;border-left:4px solid var(--brass,#b08a2e);background:#f6f3ea;border-radius:2px;}
+.sec-title:first-of-type{margin-top:6px}
 .form-row{margin-bottom:14px;}
 .req{color:var(--stamp-red);}
 .hidden{display:none !important;}
@@ -399,14 +401,17 @@ html.in-nexus .top,html.in-nexus header,html.in-nexus .topbar{padding-right:56px
             <div style="margin-left:20px"><span class="toggle-label">DC</span>
               <div class="toggle-group" id="tg-dc"><button type="button" class="tg-btn active" data-v="cp" onclick="setDcMode('cp')">CP DC (print)</button><button type="button" class="tg-btn" data-v="co" onclick="setDcMode('co')">Company DC</button></div></div>
           </div>
-          <div class="form-grid">
+          <div class="sec-title">Sender Details</div>
+          <div class="form-grid" >
             <div><label class="field-label" id="lbl-from">Sent By (Name) <span class="req">*</span></label><input type="text" id="t-from" placeholder="Name"></div>
-            <div id="wrap-nextdept"><label class="field-label">To (Name) <span class="req">*</span></label><input type="text" id="t-nextdept" placeholder="Name"></div>
-            <div><label class="field-label" id="lbl-to">To (Company / Place) <span class="req">*</span></label><input type="text" id="t-to" placeholder="Company or place"></div>
-            <div><label class="field-label">Date <span class="req">*</span></label><input type="date" id="t-date"></div>
-            <div><label class="field-label">Time <span class="req">*</span></label><input type="time" id="t-time"></div>
             <div><label class="field-label">Department <span class="req">*</span></label><select id="t-dept" onchange="onDeptChange()"></select>
               <input type="text" id="t-dept-other" class="hidden" style="margin-top:8px" placeholder="Type new department (saved for next time)"></div>
+            <div><label class="field-label">Date <span class="req">*</span></label><input type="date" id="t-date"></div>
+            <div><label class="field-label">Time <span class="req">*</span></label><input type="time" id="t-time"></div>
+            <div><label class="field-label">Approved By (Factory Manager) <span class="req">*</span></label><input type="text" id="t-approver"></div>
+          </div>
+          <div class="sec-title">Material Details</div>
+          <div class="form-grid" >
             <div><label class="field-label">Material Type <span class="req">*</span></label><select id="t-mtype" onchange="onMtypeChange()"></select>
               <input type="text" id="t-mtype-other" class="hidden" style="margin-top:8px" placeholder="Type new material type (saved for next time)"></div>
             <div><label class="field-label">Product Name <span class="req">*</span></label><input type="text" id="t-product" placeholder="Product / item name"></div>
@@ -417,7 +422,14 @@ html.in-nexus .top,html.in-nexus header,html.in-nexus .topbar{padding-right:56px
             <div><label class="field-label">Unit <span class="req">*</span></label><select id="t-unit" onchange="onUnitChange()"></select>
               <input type="text" id="t-unit-other" class="hidden" style="margin-top:8px" placeholder="Type new unit (saved for next time)"></div>
             <div style="grid-column:1/-1"><label class="field-label">Remarks</label><textarea id="t-remarks" rows="4" placeholder="Optional" style="width:100%;min-height:96px;font-size:15px;line-height:1.45;resize:vertical"></textarea></div>
-            <div><label class="field-label">Approved By (Factory Manager) <span class="req">*</span></label><input type="text" id="t-approver"></div>
+          </div>
+          <div class="sec-title">Receiver Details</div>
+          <div class="form-grid" >
+            <div id="wrap-nextdept"><label class="field-label">To (Name) <span class="req">*</span></label><input type="text" id="t-nextdept" placeholder="Name"></div>
+            <div><label class="field-label" id="lbl-to">To (Company / Place) <span class="req">*</span></label><input type="text" id="t-to" placeholder="Company or place"></div>
+          </div>
+          <div class="sec-title">Document</div>
+          <div class="form-grid" >
             <div><label class="field-label">DC No.</label><input type="text" id="t-dcno" readonly placeholder="Created when you click Print DC" style="background:var(--paper);font-family:'IBM Plex Mono',monospace;font-weight:600"></div>
             <div><label class="field-label">Signed Document <span class="req">*</span></label><div id="pk-t"></div></div>
           </div>
