@@ -396,6 +396,8 @@ html.in-nexus .top,html.in-nexus header,html.in-nexus .topbar{padding-right:56px
               <div class="toggle-group" id="tg-dir"><button type="button" class="tg-btn" data-v="IN" onclick="setDir('IN')">IN</button><button type="button" class="tg-btn active out" data-v="OUT" onclick="setDir('OUT')">OUT</button></div></div>
             <div style="margin-left:20px"><span class="toggle-label">Material</span>
               <div class="toggle-group" id="tg-ret"><button type="button" class="tg-btn active" data-v="1" onclick="setRet(true)">Returnable</button><button type="button" class="tg-btn" data-v="0" onclick="setRet(false)">Non-Returnable</button></div></div>
+            <div style="margin-left:20px"><span class="toggle-label">DC</span>
+              <div class="toggle-group" id="tg-dc"><button type="button" class="tg-btn active" data-v="cp" onclick="setDcMode('cp')">CP DC (print)</button><button type="button" class="tg-btn" data-v="co" onclick="setDcMode('co')">Company DC</button></div></div>
           </div>
           <div class="form-grid">
             <div><label class="field-label" id="lbl-from">Sent By (Name) <span class="req">*</span></label><input type="text" id="t-from" placeholder="Name"></div>
@@ -414,7 +416,7 @@ html.in-nexus .top,html.in-nexus header,html.in-nexus .topbar{padding-right:56px
             <div><label class="field-label">Qty <span class="req">*</span></label><input type="number" id="t-qty" min="0" step="any" placeholder="Quantity"></div>
             <div><label class="field-label">Unit <span class="req">*</span></label><select id="t-unit" onchange="onUnitChange()"></select>
               <input type="text" id="t-unit-other" class="hidden" style="margin-top:8px" placeholder="Type new unit (saved for next time)"></div>
-            <div><label class="field-label">Remarks</label><input type="text" id="t-remarks" placeholder="Optional"></div>
+            <div style="grid-column:1/-1"><label class="field-label">Remarks</label><textarea id="t-remarks" rows="4" placeholder="Optional" style="width:100%;min-height:96px;font-size:15px;line-height:1.45;resize:vertical"></textarea></div>
             <div><label class="field-label">Approved By (Factory Manager) <span class="req">*</span></label><input type="text" id="t-approver"></div>
             <div><label class="field-label">DC No.</label><input type="text" id="t-dcno" readonly placeholder="Created when you click Print DC" style="background:var(--paper);font-family:'IBM Plex Mono',monospace;font-weight:600"></div>
             <div><label class="field-label">Signed Document <span class="req">*</span></label><div id="pk-t"></div></div>
@@ -649,7 +651,7 @@ html.in-nexus .top,html.in-nexus header,html.in-nexus .topbar{padding-right:56px
       <div><label class="field-label">Name <span class="req">*</span></label><input type="text" id="r-name" placeholder="Received / returned by"></div>
       <div><label class="field-label">To <span class="req">*</span></label><input type="text" id="r-to" placeholder="Handed over to"></div>
       <div><label class="field-label">Qty Returned <span class="req">*</span></label><input type="number" id="r-qty" min="0" step="any"></div>
-      <div><label class="field-label">Condition / Remarks</label><input type="text" id="r-remarks" placeholder="e.g. Repaired &amp; checked"></div>
+      <div style="grid-column:1/-1"><label class="field-label">Condition / Remarks</label><textarea id="r-remarks" rows="4" placeholder="e.g. Repaired &amp; checked" style="width:100%;min-height:96px;font-size:15px;line-height:1.45;resize:vertical"></textarea></div>
       <div><label class="field-label">Approved By (Factory Manager) <span class="req">*</span></label><input type="text" id="r-approver"></div>
       <div><label class="field-label">Return DC No.</label><input type="text" id="r-dcno" readonly placeholder="Created when you click Print" style="background:var(--paper);font-family:'IBM Plex Mono',monospace;font-weight:600"></div>
     </div>
@@ -748,7 +750,7 @@ const isOther = v => v === 'Other' || v === 'Others';
 /* ---------- state ---------- */
 let currentRole = null, currentUser = null, currentName = '';
 let transit = [], passes = [], options = [], backups = [];
-let tf = { dir:'OUT', ret:true };
+let tf = { dir:'OUT', ret:true, dcMode:'cp' };
 let timeOffset = 0;
 const now = () => Date.now() + timeOffset;
 const pickers = {};
@@ -1169,7 +1171,7 @@ function updateSteps(){
   if(!$('t-from')) return;
   quiet=true;
   try{
-    const t=readTransit(false); stepsApply('steps-t','pk-t','t-save',stepOf(t,tf.dcNo,t&&t.sig,tf.sig,pickers.t,'Print DC'));
+    const t=readTransit(false); const co=tf.dcMode==='co'; const ts=stepOf(t,co?$('t-dcno').value.trim():tf.dcNo,t&&t.sig,co?(t&&t.sig):tf.sig,pickers.t,'Print DC'); if(co&&ts.cur<3) ts.note=ts.cur===1?'Fill all the required details and type the Company DC No.':'Company DC No. entered. Upload the signed Company DC copy.'; stepsApply('steps-t','pk-t','t-save',ts);
     const r=readReturn(false); stepsApply('steps-r','pk-r','r-save',stepOf(r,returnDc,r&&r._sig,returnSig,pickers.r,'Print Return DC'));
     const g=readPass(false,'g'); stepsApply('steps-g','pk-g','g-save',stepOf(g,gfs.g.no,g&&g.sig,gfs.g.sig,pickers.g,'Print Gate Pass'));
     const o=readPass(false,'o'); stepsApply('steps-o','pk-o','o-save',stepOf(o,gfs.o.no,o&&o.sig,gfs.o.sig,pickers.o,'Print One Way Pass'));
@@ -1375,6 +1377,16 @@ function setRet(r){
   document.querySelectorAll('#tg-ret .tg-btn').forEach(b=>b.classList.toggle('active',(b.dataset.v==='1')===r));
   $('t-purpose').closest('#wrap-purpose').querySelector('.req').style.display = r?'':'none';
 }
+function setDcMode(m){
+  tf.dcMode=m; const co=m==='co';
+  document.querySelectorAll('#tg-dc .tg-btn').forEach(b=>b.classList.toggle('active',b.dataset.v===m));
+  const d=$('t-dcno'); d.value=''; tf.dcNo=null; tf.dcSeries=null; tf.sig=null;
+  d.readOnly=!co; d.placeholder=co?'Type the Company DC No.':'Created when you click Print DC';
+  d.style.background=co?'#fff':'var(--paper)';
+  $('t-print').style.display=co?'none':'';
+  stepsFill('steps-t',co?'Enter Company DC No.':'Print DC');
+  updateSteps();
+}
 function resetTransitForm(){
   ['t-from','t-nextdept','t-to','t-product','t-dept-other','t-mtype-other','t-qty','t-remarks','t-unit-other','t-dcno'].forEach(i=>$(i).value='');
   const np=nowParts(); $('t-date').value=np.date; $('t-time').value=np.time;
@@ -1398,17 +1410,17 @@ function readTransit(needSigned){
   let unit=$('t-unit').value; if(!unit) miss.push('Unit'); else if(isOther(unit)){ unit=v('t-unit-other'); if(!unit) miss.push('New unit'); }
   let purpose=$('t-purpose').value; if(tf.ret){ if(!purpose) miss.push('Purpose'); else if(isOther(purpose)){ purpose=v('t-purpose-other'); if(!purpose) miss.push('New purpose'); } }
   if(!v('t-approver')) miss.push('Approved By');
-  if(needSigned){ if(!tf.dcNo) miss.push('Print DC first (DC No.)'); if(!pickers.t) miss.push('Signed Document'); }
+  if(needSigned){ if(tf.dcMode==='co'){ if(!v('t-dcno')) miss.push('Company DC No.'); } else if(!tf.dcNo) miss.push('Print DC first (DC No.)'); if(!pickers.t) miss.push('Signed Document'); }
   if(miss.length){ qtoast('Required: '+miss.join(', ')); return null; }
   const o={ dept, mt, purpose, unit, row:{
       direction:dir, returnable:tf.ret, from_name:v('t-from'),
       next_dept: dir==='OUT'?v('t-nextdept'):null, to_name:v('t-to'),
       event_at: toIso(v('t-date'),v('t-time')), department:dept, material_type:mt, product_name:v('t-product'),
       purpose: tf.ret?purpose:null, qty, unit, remarks:v('t-remarks')||null, approver_name:v('t-approver'),
-      dc_no: tf.dcNo||null,
+      dc_no: (tf.dcMode==='co'?v('t-dcno'):tf.dcNo)||null,
       status: tf.ret?'Yet to Return':'Non-Returnable', created_by:currentName } };
   o.sig=JSON.stringify({...o.row,dc_no:0,created_by:0});
-  if(needSigned && o.sig!==tf.sig){ qtoast('Details were changed after printing — click Print DC again so the signed copy matches.'); return null; }
+  if(needSigned && tf.dcMode!=='co' && o.sig!==tf.sig){ qtoast('Details were changed after printing — click Print DC again so the signed copy matches.'); return null; }
   return o;
 }
 async function printTransitDC(){
