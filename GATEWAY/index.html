@@ -455,6 +455,28 @@ function wsCheck(login,pw){
   }).catch(function(){return null});
 }
 var NX_LIVE_FALLBACK={approvals:1,cp_portal:1,eng_worklog:1,requisition:1,security_tracking:1}; /* used only if the links list cannot be read */
+/* the tiles this user may see, read from the NEXUS tile list (also used again when a saved sign-in is restored, so new tiles appear without signing in again) */
+function nxTiles(res){
+  var H={apikey:NX_KEY,Authorization:"Bearer "+NX_KEY};
+  return jf(NX_URL+"/rest/v1/nexus_portals?select=*&order=sort_order",{headers:H}).then(function(p){
+    return jf(NX_URL+"/rest/v1/portal_links?select=portal_id,url",{headers:H}).then(function(l){ var lk=null; if(l.ok&&Array.isArray(l.json)){ lk={}; l.json.forEach(function(x){ if(x.url) lk[x.portal_id]=1; }); } return {p:p,lk:lk}; }).catch(function(){ return {p:p,lk:null}; });
+  }).then(function(pl){ var p=pl.p, lk=pl.lk, tiles=null;
+    if(p.ok&&Array.isArray(p.json)&&p.json.length){
+      tiles=[];
+      p.json.forEach(function(r){
+        var active=(r.active!==false)||r.portal_id==="portal_links";
+        if(!active) return;
+        var see;
+        if(r.portal_id==="portal_links") see=(res.isSuper===true);
+        else if(res.isAdmin===true||res.role==="manager") see=true;
+        else see=Array.isArray(r.allowed_depts)&&r.allowed_depts.indexOf(res.role)>-1;
+        var link=!!r.url||(lk?!!lk[r.portal_id]:!!NX_LIVE_FALLBACK[r.portal_id]); /* a tile with a live link is REAL TIME; no link = uploaded file */
+        if(see) tiles.push({id:r.portal_id,title:r.title,link:link});
+      });
+    }
+    return tiles;
+  }).catch(function(){return null;});
+}
 /* CP NEXUS: sign in, read my role and screens (same rule as the NEXUS home page); kept in memory only */
 function nxCheck(login,pw){
   var H={apikey:NX_KEY,Authorization:"Bearer "+NX_KEY,"Content-Type":"application/json"};
@@ -462,24 +484,7 @@ function nxCheck(login,pw){
     if(!a.ok||!a.json||!a.json.ok) return null;
     var u=a.json.user||{};
     var res={must:u.must_change_password===true,name:u.display_name,role:u.role_id,roleName:u.role_name,isAdmin:u.is_admin===true||u.role_id==='manager',isSuper:u.is_super===true,token:a.json.token,tiles:null};
-    return jf(NX_URL+"/rest/v1/nexus_portals?select=*&order=sort_order",{headers:{apikey:NX_KEY,Authorization:"Bearer "+NX_KEY}}).then(function(p){
-      return jf(NX_URL+"/rest/v1/portal_links?select=portal_id,url",{headers:{apikey:NX_KEY,Authorization:"Bearer "+NX_KEY}}).then(function(l){ var lk=null; if(l.ok&&Array.isArray(l.json)){ lk={}; l.json.forEach(function(x){ if(x.url) lk[x.portal_id]=1; }); } return {p:p,lk:lk}; }).catch(function(){ return {p:p,lk:null}; });
-    }).then(function(pl){ var p=pl.p, lk=pl.lk;
-      if(p.ok&&Array.isArray(p.json)&&p.json.length){
-        res.tiles=[];
-        p.json.forEach(function(r){
-          var active=(r.active!==false)||r.portal_id==="portal_links";
-          if(!active) return;
-          var see;
-          if(r.portal_id==="portal_links") see=(u.is_super===true);
-          else if(u.is_admin===true||u.role_id==="manager") see=true;
-          else see=Array.isArray(r.allowed_depts)&&r.allowed_depts.indexOf(u.role_id)>-1;
-          var link=!!r.url||(lk?!!lk[r.portal_id]:!!NX_LIVE_FALLBACK[r.portal_id]); /* a tile with a live link is REAL TIME; no link = uploaded file */
-          if(see) res.tiles.push({id:r.portal_id,title:r.title,link:link});
-        });
-      }
-      return res;
-    }).catch(function(){return res});
+    return nxTiles(res).then(function(t){ if(t) res.tiles=t; return res; });
   }).catch(function(){return null});
 }
 
@@ -728,7 +733,8 @@ function gwRestore(){
   }
   if(raw.nx&&raw.nx.token){
     nxP=jf(NX_URL+"/rest/v1/rpc/nexus_whoami",{method:"POST",headers:{apikey:NX_KEY,Authorization:"Bearer "+NX_KEY,"Content-Type":"application/json","x-nexus-token":raw.nx.token},body:"{}"}).then(function(w){
-      return (w.ok&&w.json&&w.json.signed_in)?raw.nx:null;
+      if(!(w.ok&&w.json&&w.json.signed_in)) return null;
+      return nxTiles(raw.nx).then(function(t){ if(t) raw.nx.tiles=t; return raw.nx; });
     }).catch(function(){return null;});
   }
   Promise.all([wsP,nxP]).then(function(r){
