@@ -610,12 +610,14 @@ function render(){
   live.forEach(function(t,i){t.i=i;}); live.sort(function(a,b){return (a.o-b.o)||(a.i-b.i);});
   function fillSec(title,nt,arr,emptyMsg){
     var g=section(title,nt,null);
-    if(arr.length) arr.forEach(function(t){ g.appendChild(gtile(t.img,t.name,"",function(){window.location.assign(handoffUrl(t.sys,t.sys==="CP NEXUS"?NX_APP:WS_APP,t.id));})); });
+    if(arr.length) arr.forEach(function(t){ g.appendChild(gtile(t.img,t.name,"",function(){try{sessionStorage.setItem("cp_gw_sec",title);}catch(e){} window.location.assign(handoffUrl(t.sys,t.sys==="CP NEXUS"?NX_APP:WS_APP,t.id));})); });
     else g.appendChild(note("gnone",emptyMsg));
     var hh=g._h; if(hh&&hh._cnt) hh._cnt(arr.length);
+    try{ if(sessionStorage.getItem("cp_gw_sec")===title){ sessionStorage.removeItem("cp_gw_sec"); setTimeout(function(){ if(hh&&!hh.classList.contains("open")) hh.click(); },60); } }catch(e){}
     return g;
   }
-  if(ws||nx){ var hl=document.createElement("div"); hl.className="ghl"; hl.style.cssText="margin:-4px 0 6px;font-size:12px;opacity:.8"; hl.appendChild(document.createTextNode("Home pages: "));
+  var onlyAdmin=!!((nx&&nx.isSuper)||(ws&&ws.code==="ADMIN")); /* only the Administrator opens the NEXUS / WORKSPACE home pages */
+  if(onlyAdmin&&(ws||nx)){ var hl=document.createElement("div"); hl.className="ghl"; hl.style.cssText="margin:-4px 0 6px;font-size:12px;opacity:.8"; hl.appendChild(document.createTextNode("Home pages: "));
     if(ws){ var a1=document.createElement("a"); a1.textContent="CP WORKSPACE"; a1.style.cssText="color:#ffe08c;cursor:pointer;text-decoration:underline"; a1.onclick=function(){window.location.assign(handoffUrl("CP WORKSPACE",WS_APP));}; hl.appendChild(a1); }
     if(ws&&nx&&!lock) hl.appendChild(document.createTextNode("  ·  "));
     if(nx&&!lock){ var a2=document.createElement("a"); a2.textContent="CP NEXUS"; a2.style.cssText="color:#ffe08c;cursor:pointer;text-decoration:underline"; a2.onclick=function(){window.location.assign(handoffUrl("CP NEXUS",NX_APP));}; hl.appendChild(a2); }

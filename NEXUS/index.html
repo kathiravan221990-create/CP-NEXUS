@@ -1483,6 +1483,7 @@ function decodeEmbeddedHtml(b64){
     document.getElementById('homeUserName').textContent = currentUser.name || 'User';
     document.getElementById('homeUserDept').textContent = currentUser.dept ? currentUser.dept.name : '';
     buildTiles();
+    if(gwOnlyHome() && !window.__gwOpen){ goGateway(); return; }
     show('home');
     if(window.__gwOpen){ const wanted = window.__gwOpen; window.__gwOpen = null; setTimeout(function(){ const pp = NEXUS_CONFIG.portals.filter(function(x){ return x.id === wanted; })[0]; if(pp && pp._active !== false) openPortal(pp); }, 60); }
     refreshPortalsFromApi().then(function(ok){ if(ok) buildTiles(); }); // pick up the latest shared tile settings
@@ -1708,7 +1709,10 @@ function decodeEmbeddedHtml(b64){
   });
 
   // ---------- return to home from inside a portal ----------
+  /* only the Administrator uses the NEXUS home page; everyone else goes back to the Gateway (their section stays open there) */
+  function gwOnlyHome(){ try { return sessionStorage.getItem('nx_via_gw') === '1' && !(currentUser && currentUser.dept && currentUser.dept.isSuper === true); } catch(e){ return false; } }
   document.getElementById('btnHomeFromPortal').addEventListener('click', function(){
+    if(gwOnlyHome()){ goGateway(); return; }
     runLoading('Loading Home', 'Loading', 1200, function(){
       document.getElementById('portal-frame').srcdoc = '';
       show('home');
