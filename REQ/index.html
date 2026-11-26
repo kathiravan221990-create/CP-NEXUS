@@ -3365,5 +3365,13 @@ if(false)
 (async()=>{const u=sessionStorage.getItem('cp_req_user')||localStorage.getItem('cp_req_user');if(u&&DEPTS.includes(u)&&myName){hold=true;$('#loader').style.display='flex';const t0=Date.now();try{settings=await db.settings()}catch(e){}await start(u);await new Promise(r=>setTimeout(r,Math.max(0,700-(Date.now()-t0))));hold=false;$('#loader').style.display=spin>0?'flex':'none'}})();
 </script>
 <script src="../nx-notify.js"></script>
+<script>
+/* tell CP NEXUS when this page is really on screen, so its loading screen can hide the login flash */
+(function(){try{if(window.parent===window)return}catch(e){return}
+var sent=false,t0=Date.now();
+function send(){if(sent)return;sent=true;try{window.parent.postMessage({type:'nexus-shown'},'*')}catch(e){}}
+window.__nxShown=send;
+var iv=setInterval(function(){var ok=false;try{ok=(document.getElementById('app').style.display==='block')||((function(){var n=document.getElementById('lerr');return !!(n&&n.textContent)})())}catch(e){} if(ok||Date.now()-t0>12000){clearInterval(iv);send()}},120);})();
+</script>
 </body>
 </html>
