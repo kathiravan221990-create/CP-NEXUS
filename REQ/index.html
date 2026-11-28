@@ -3353,7 +3353,8 @@ function nexusBoot(){
   if(!d){showLoginMsg('Your role ('+(u.role_name||u.role_id)+') is not set up for the Requisition Portal. Please ask your administrator.');return}
   NEXUS_USER=u;NEXUS_TOKEN=m.token;myName=u.display_name||u.username;
   try{settings=await db.settings()}catch(e){}
-  await start(d);hold=false;$('#loader').style.display=spin>0?'flex':'none';
+  await start(d);if(u.role_id==='administrator'){try{$('#who').textContent='\u{1F464} Administrator'+(myName?' \u00B7 '+myName:'')}catch(e){}} /* label only; permissions stay the same */
+  hold=false;$('#loader').style.display=spin>0?'flex':'none';
   setInterval(async()=>{ /* a disabled or signed-out person loses access within minutes */
    try{const x=await nexusCheck(NEXUS_TOKEN);if(!x){NEXUS_USER=null;NEXUS_TOKEN='';me=null;showLoginMsg('Your Nexus session has ended. Please sign in again in CP NEXUS.')}}catch(e){}
   },180000);

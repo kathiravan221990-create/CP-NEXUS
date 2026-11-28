@@ -917,7 +917,7 @@ function render(){
      ${items.some(i=>i[0]==='raise')?`<div class="nav raisebtn${S.page==='raise'?' on':''}" data-nav="raise"><span class="ni">➕</span>Raise Ticket</div>`:''}
      ${items.filter(i=>i[0]!=='raise').map(i=>`<div class="nav${S.page===i[0]?' on':''}" data-nav="${i[0]}"><span class="ni">${NAVICO[i[0]]||'•'}</span>${esc(i[1])}${i[2]?`<span class="bd">${i[2]}</span>`:''}</div>`).join('')}
      <div class="sp"></div>
-     <div class="who">Signed in as<br><b>${esc(u.name)}</b><br>${esc(ROLES[u.role])}<br><button class="btn" data-act="logout" style="margin-top:10px;width:100%">⏻ Logout</button></div>
+     <div class="who">Signed in as<br><b>${esc(u.disp||u.name)}</b><br>${esc(u.roleLabel||ROLES[u.role])}<br><button class="btn" data-act="logout" style="margin-top:10px;width:100%">⏻ Logout</button></div>
    </div>
    <div class="main">
      <div class="top"><div class="ttl">${GEAR_SVG('gi')}<div><h1>${esc(t[0])}</h1><div class="s">${esc(brand())} · ${esc(t[1])}</div></div></div><div class="tools">${sw}<div class="modesw" title="Ultra = full form · Lite = Department + Problem only"><button data-act="mode" data-m="ultra" class="${S.mode==='ultra'?'on':''}">Ultra</button><button data-act="mode" data-m="lite" class="${S.mode==='lite'?'on':''}">Lite</button></div><button class="btn sm" data-act="exportall">⬇ Excel</button></div></div>
@@ -1676,6 +1676,7 @@ async function nexusStart(tok){
   const nm=(u.display_name||u.username);
   const r=buildUser(team,co,nm);if(!r){showNexusMsg('Could not open your unit.');return}
   r.user.email=u.username;
+  if(u.role_id==='administrator'){r.user.disp=nm+' (Administrator)';r.user.roleLabel='Administrator'} /* shown only; the Manager permissions and the saved name stay the same, so tickets are not disturbed */
   $('login').hidden=true;startApp(r.user,r.view);
   setInterval(()=>{if(document.hidden)return;window.__pull().catch(()=>{})},12000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)window.__pull().catch(()=>{})});
