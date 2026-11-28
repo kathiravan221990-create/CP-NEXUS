@@ -331,6 +331,7 @@ body{background:radial-gradient(120% 80% at 60% -10%,#0a2347 0%,#041126 55%,#020
 td{background:rgba(6,24,52,.6)!important}
 tr.tot td{background:linear-gradient(180deg,#f3d98d,#cfa443)!important;color:#1b1404!important;font-weight:700}
 /* single sign-out: only the Gateway of CP logs out */.nv.out{display:none!important}
+.stat.on{background:linear-gradient(180deg,rgba(243,217,141,.38),rgba(205,150,15,.22))!important;border:2px solid var(--gold2)!important;box-shadow:0 0 0 3px rgba(243,217,141,.25),0 8px 22px rgba(0,0,0,.35)!important;transform:translateY(-2px)}.stat.on b{color:#fff!important}
 </style>
 <script>try{if(window.parent!==window)document.documentElement.classList.add('in-nexus')}catch(e){document.documentElement.classList.add('in-nexus')}</script>
 </head>
@@ -2914,12 +2915,12 @@ function syncBars(v){
  });
 }
 function render(){
- const v=visible(),c=st=>v.filter(r=>r.status===st).length,am=st=>sumAmt(v.filter(r=>st==='ALL'||r.status===st));
- const cards=[['ALL','Total',v.length],['Pending','Pending Approval',c('Pending')],['Approved','Approved',c('Approved')],['Confirmed','HR Confirmed',c('Confirmed')],['Rejected','Rejected',c('Rejected')]];
+ const v=visible(),vf=v.filter(fOk),c=st=>vf.filter(r=>r.status===st).length,am=st=>sumAmt(vf.filter(r=>st==='ALL'||r.status===st));
+ const cards=[['ALL','Total',vf.length],['Pending','Pending Approval',c('Pending')],['Approved','Approved',c('Approved')],['Confirmed','HR Confirmed',c('Confirmed')],['Rejected','Rejected',c('Rejected')]];
  collapsed.stats=false;$('#stats').style.display='';
  $('#stats').innerHTML=cards.map(x=>`<div class="stat ${dashPick===x[0]?'on':''}" onclick="dashPick=(dashPick==='${x[0]}'?null:'${x[0]}');render();if(dashPick)document.getElementById('dashlist').scrollIntoView({behavior:'smooth',block:'start'})"><b>${x[2]}</b><span>${x[1]}</span><br><span style="color:var(--gold2);font-weight:700">${inr(am(x[0]))}</span></div>`).join('');
  syncBars(v);renderDash(v);
- const dl=$('#dashlist');$('#dashfb').style.display=dashPick?'':'none';
+ const dl=$('#dashlist');$('#dashfb').style.display='';
  if(dashPick){const pk=cards.find(x=>x[0]===dashPick);const DL=v.filter(r=>(dashPick==='ALL'||r.status===dashPick)&&fOk(r));
   dl.style.display='';
   dl.innerHTML=`<h3 class="sh">${pk?pk[1]:''}<em class="badge">${DL.length}</em><span class="sp"></span><button class="btn sm" onclick="dashPick=null;render()">&#10005; Close</button></h3><div class="tw"><table><thead><tr><th></th><th>Req No</th><th>Date</th><th>Unit</th><th>Dept</th><th>Material / Product</th><th>Vendor</th><th>Amount</th><th>Type</th><th>Status</th><th>Actions</th></tr></thead><tbody>${DL.length?DL.map(rowHtml).join(''):'<tr><td colspan="11" class="empty">No requisitions</td></tr>'}</tbody></table></div>`;
