@@ -2004,14 +2004,14 @@ $("bellAll").onclick=function(){ if(!(me&&me.nx))return; jf(NX_URL+"/rest/v1/rpc
     if(!RM&&innerWidth>860){ var cx=(e.clientX/innerWidth-.5)*2,cy=(e.clientY/innerHeight-.5)*2; ph.style.transform="translate("+(-cx*14).toFixed(1)+"px,"+(-cy*8).toFixed(1)+"px)"; }
   });
   document.addEventListener("click",function(e){ if(!login.hidden) splash(e.clientX,e.clientY); });
-  /* click Clarion: it turns around once, gently, and comes back to its place */
+  /* click Clarion: it spins around its vertical axis like a coin, and comes back to its place */
   var clar=login.querySelector(".gl-clar"),diving=false;
   clar.style.cursor="pointer"; clar.title="Click";
   clar.addEventListener("click",function(e){
     e.stopPropagation(); if(diving) return; diving=true;
     var r=clar.getBoundingClientRect(); splash(r.left+r.width/2,r.top+r.height/2);
     if(!clar.animate){diving=false;return;}
-    var an=clar.animate([{transform:"rotate(0deg)"},{transform:"rotate(360deg)"}],{duration:2600,easing:"ease-in-out"});
+    var an=clar.animate([{transform:"perspective(700px) rotateY(0deg)"},{transform:"perspective(700px) rotateY(360deg)"}],{duration:1800,easing:"ease-in-out"});
     an.onfinish=an.oncancel=function(){ diving=false; };
   });
   sync();
