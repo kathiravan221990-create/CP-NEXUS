@@ -704,6 +704,7 @@ function handoffUrl(title,url,openId){
   url=url+(url.indexOf("?")<0?"?":"&")+"v="+Date.now(); /* always fetch the newest version of the app (browsers may keep a copy for up to 10 minutes) */
   /* one-time pass in the address #fragment (never sent to a server); the app reads it, stores it and clears it */
   try{
+    if(title==="CP WORKSPACE"&&me&&me.ws){ var shh=wsShared(me.login); if(shh){ me.ws.tok=shh.access_token; me.ws.rtok=shh.refresh_token; try{gwSave();}catch(e){} } }
     if(title==="CP WORKSPACE"&&me&&me.ws&&me.ws.tok){ me.ws.handed=true; return url+"#gw="+encodeURIComponent(btoa(JSON.stringify({a:me.ws.tok,r:me.ws.rtok||""})))+(openId?"&open="+encodeURIComponent(openId):""); }
     if(title==="CP NEXUS"&&me&&me.nx&&me.nx.token){ me.nx.handed=true; return url+"#gw="+encodeURIComponent(me.nx.token)+(openId?"&open="+encodeURIComponent(openId):""); }
   }catch(e){}
@@ -718,10 +719,24 @@ function signOutAll(keepHanded){
 var GW_KEY="cp_gw_session";
 function gwSave(){try{localStorage.setItem(GW_KEY,JSON.stringify({login:me.login,ws:me.ws,nx:me.nx}));}catch(e){}}
 function gwClear(){try{localStorage.removeItem(GW_KEY);}catch(e){}}
+/* the apps on this website share ONE CP WORKSPACE sign-in in the browser (kept fresh by whichever app renews it).
+   The Gateway reads that live copy instead of trusting its own older one, so the sign-in lasts until Log Out. */
+var WS_SHARED_KEY="sb-axnxhqcvevviwnncplwt-auth-token";
+function wsShared(login){
+  try{
+    var o=JSON.parse(localStorage.getItem(WS_SHARED_KEY)||"null");
+    if(!o||!o.access_token||!o.refresh_token) return null;
+    var em=(o.user&&o.user.email)?String(o.user.email).toLowerCase():"", lg=String(login||"").toLowerCase();
+    if(em&&lg){ var want=lg.indexOf("@")>=0?lg:lg+"@classicpack.com"; if(em!==want) return null; }
+    return o;
+  }catch(e){return null;}
+}
+function wsSharedWrite(j){ try{ if(j&&j.access_token&&j.refresh_token) localStorage.setItem(WS_SHARED_KEY,JSON.stringify(j)); }catch(e){} }
 function gwRestore(){
   var raw=null; try{raw=JSON.parse(localStorage.getItem(GW_KEY)||"null");}catch(e){}
   if(!raw||!raw.login||(!raw.ws&&!raw.nx)){gwClear();return;}
   var wsP=Promise.resolve(null), nxP=Promise.resolve(null);
+  if(raw.ws){ var sh=wsShared(raw.login); if(sh){ raw.ws.tok=sh.access_token; raw.ws.rtok=sh.refresh_token; } }
   if(raw.ws&&raw.ws.tok){
     var H2={apikey:WS_KEY,Authorization:"Bearer "+raw.ws.tok,"Content-Type":"application/json","Content-Profile":"core_api","Accept-Profile":"core_api"};
     wsP=jf(WS_URL+"/rest/v1/rpc/me",{method:"POST",headers:H2,body:"{}"}).then(function(m){
@@ -729,7 +744,7 @@ function gwRestore(){
       if(!raw.ws.rtok) return null;
       return jf(WS_URL+"/auth/v1/token?grant_type=refresh_token",{method:"POST",headers:{apikey:WS_KEY,"Content-Type":"application/json"},body:JSON.stringify({refresh_token:raw.ws.rtok})}).then(function(a){
         if(!a.ok||!a.json||!a.json.access_token) return null;
-        raw.ws.tok=a.json.access_token; raw.ws.rtok=a.json.refresh_token||raw.ws.rtok; return raw.ws;
+        raw.ws.tok=a.json.access_token; raw.ws.rtok=a.json.refresh_token||raw.ws.rtok; wsSharedWrite(a.json); return raw.ws;
       });
     }).catch(function(){return null;});
   }
@@ -983,10 +998,11 @@ var NEXUS_CONFIG={portals:[],departments:[]};
   const WS_CODE_FOR_NX = {}; Object.keys(DEPT_TO_NX).forEach(function(k){ WS_CODE_FOR_NX[DEPT_TO_NX[k]] = k; });
   /* the CP WORKSPACE sign-in lasts about an hour: renew it quietly with the saved refresh key, then try again once */
   async function wsRenew(){
+    if(me && me.ws){ const shr = wsShared(me.login); if(shr) me.ws.rtok = shr.refresh_token; }
     if(!(me && me.ws && me.ws.rtok)) return false;
     const a = await jf(WS_URL + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: { apikey: WS_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: me.ws.rtok }) });
     if(!a.ok || !a.json || !a.json.access_token) return false;
-    me.ws.tok = a.json.access_token; me.ws.rtok = a.json.refresh_token || me.ws.rtok; try{ gwSave(); }catch(e){}
+    me.ws.tok = a.json.access_token; me.ws.rtok = a.json.refresh_token || me.ws.rtok; wsSharedWrite(a.json); try{ gwSave(); }catch(e){}
     return true;
   }
   function wsExpired(r){ return r.status === 401 || /jwt|expired/i.test(JSON.stringify(r.json || '')); }
