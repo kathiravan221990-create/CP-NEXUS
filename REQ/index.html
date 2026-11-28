@@ -373,7 +373,7 @@ tr.tot td{background:linear-gradient(180deg,#f3d98d,#cfa443)!important;color:#1b
     <div class="tw"><table><thead><tr><th></th><th>Req No</th><th>Date</th><th>Unit</th><th>Dept</th><th>Material / Product</th><th>Vendor</th><th>Amount</th><th>Type</th><th>Status</th><th>Actions</th></tr></thead><tbody id="lobbytb"></tbody></table></div>
    </section>
    <section id="dashSec">
-    <div class="sech" onclick="toggleSec('stats')"><span id="ar_stats"></span> Dashboard - Summary</div>
+    <div class="sech"><span id="ar_stats">&#9662;</span> Dashboard - Summary</div>
     <div class="stats" id="stats"></div>
     <div class="bar fb" id="dashfb" style="display:none"><input class="fq" placeholder="Search req no, material, vendor..." oninput="setQ(this.value)"><select class="fm" onchange="setFM(this.value)"></select><select class="fd" onchange="setFD(this.value)"></select><button class="btn sm dark" onclick="clearF()">Clear</button></div><div id="dashlist" style="display:none"></div>
     <div class="dash" id="dash" style="display:none"></div>
@@ -2916,7 +2916,7 @@ function syncBars(v){
 function render(){
  const v=visible(),c=st=>v.filter(r=>r.status===st).length,am=st=>sumAmt(v.filter(r=>st==='ALL'||r.status===st));
  const cards=[['ALL','Total',v.length],['Pending','Pending Approval',c('Pending')],['Approved','Approved',c('Approved')],['Confirmed','HR Confirmed',c('Confirmed')],['Rejected','Rejected',c('Rejected')]];
- $('#stats').style.display=collapsed.stats?'none':'';$('#ar_stats').innerHTML=collapsed.stats?'&#9656;':'&#9662;';
+ collapsed.stats=false;$('#stats').style.display='';
  $('#stats').innerHTML=cards.map(x=>`<div class="stat ${dashPick===x[0]?'on':''}" onclick="dashPick=(dashPick==='${x[0]}'?null:'${x[0]}');render();if(dashPick)document.getElementById('dashlist').scrollIntoView({behavior:'smooth',block:'start'})"><b>${x[2]}</b><span>${x[1]}</span><br><span style="color:var(--gold2);font-weight:700">${inr(am(x[0]))}</span></div>`).join('');
  syncBars(v);renderDash(v);
  const dl=$('#dashlist');$('#dashfb').style.display=dashPick?'':'none';
@@ -2935,7 +2935,7 @@ function render(){
   const nb=$('#nvbadge');if(nb){nb.textContent=LB0.length;nb.style.display=LB0.length?'':'none'}
  }
  const L=listShown();
- const allOpen=L.length&&L.every(r=>openRows.has(r.id))&&!collapsed.stats&&!collapsed.dash;
+ const allOpen=L.length&&L.every(r=>openRows.has(r.id))&&true;
  $('#expbtn').innerHTML=allOpen?'<i>&#128193;</i><span>Collapse all</span>':'<i>&#128194;</i><span>Expand all</span>';
  $('#tb').innerHTML=L.length?L.map(rowHtml).join(''):'<tr><td colspan="11" class="empty">No requisitions found</td></tr>';
 }
@@ -2970,8 +2970,8 @@ const rowById=id=>rows.find(r=>r.id===id);
 function toggleSec(k){collapsed[k]=!collapsed[k];saveUI();render()}
 function toggleRow(id){openRows.has(id)?openRows.delete(id):openRows.add(id);render()}
 function toggleAll(){
- const L=listShown(),all=L.length&&L.every(r=>openRows.has(r.id))&&!collapsed.stats&&!collapsed.dash;
- if(all){openRows.clear();collapsed.stats=true;collapsed.dash=true}else{L.forEach(r=>openRows.add(r.id));collapsed.stats=false;collapsed.dash=false}
+ const L=listShown(),all=L.length&&L.every(r=>openRows.has(r.id))&&true;
+ if(all){openRows.clear()}else{L.forEach(r=>openRows.add(r.id))}
  saveUI();render();
 }
 function detailRow(r){
