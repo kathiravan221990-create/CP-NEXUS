@@ -135,9 +135,10 @@ input:disabled{opacity:.6;cursor:not-allowed;border-color:rgba(216,166,55,.25)}
 /* only the sign-in box dark (class bx on #login) */
 #login.bx .gl-in{background:rgba(9,28,58,.97);border-color:rgba(240,200,96,.45);border-top-color:#f0c860;box-shadow:0 18px 44px rgba(7,24,52,.35);-webkit-backdrop-filter:none;backdrop-filter:none}
 #login.bx .gl-in h3{color:#f0c860}#login.bx .gl-in h2{color:#fff}
-#login.bx .gl-form label{color:#9fb6d6;-webkit-text-fill-color:#9fb6d6}
+#login.bx .gl-form label{color:#c3d2ea;-webkit-text-fill-color:#c3d2ea}
 #login.bx .gl-form form>input,#login.bx .gl-form .pw input{color:#fff;-webkit-text-fill-color:#fff;border-bottom-color:#7fa0cf}
-#login.bx .gl-form input::placeholder{color:#7d93b4;-webkit-text-fill-color:#7d93b4}
+#login.bx .gl-form input::placeholder{color:#d3deef;-webkit-text-fill-color:#d3deef;opacity:1}
+#login.bx .gl-form #dd::placeholder{color:#d3deef;-webkit-text-fill-color:#d3deef;opacity:1}
 #login.bx .gl-form input:focus{border-bottom-color:#f0c860}
 #login.bx .gl-form #dd{color:#f0c860;-webkit-text-fill-color:#f0c860;border-color:#7fa0cf}
 #login.bx .gl-form .gauto,#login.bx .gl-form .pw button{color:#f0c860;-webkit-text-fill-color:#f0c860}
@@ -406,11 +407,11 @@ main h2{font-size:24px;color:var(--bright)}
                 <h3>SIGN IN</h3><h2>Welcome back</h2>
         <form id="form" autocomplete="off">
           <label for="u">Username</label>
-          <input id="u" name="u" type="text" placeholder="Enter your username" autocomplete="off" autocapitalize="none" spellcheck="false">
+          <input id="u" name="u" type="text" autocomplete="off" autocapitalize="none" spellcheck="false">
           <label for="dd">Department<span class="gauto">AUTO</span></label>
-          <input id="dd" type="text" disabled placeholder="Filled automatically when you sign in">
+          <input id="dd" type="text" disabled>
           <label for="p">Password</label>
-          <div class="pw"><input id="p" name="p" type="password" autocomplete="off" placeholder="Enter your password"><button type="button" id="eye" aria-label="Show or hide password">Show</button></div>
+          <div class="pw"><input id="p" name="p" type="password" autocomplete="off"><button type="button" id="eye" aria-label="Show or hide password">Show</button></div>
           <div id="err" class="err" role="alert" hidden></div>
           <button class="btn" type="submit">Sign in</button>
         </form>
