@@ -107,6 +107,8 @@ header small{display:block;font-size:11px;opacity:.75;letter-spacing:.5px}
 .hrt button.on{background:linear-gradient(180deg,var(--gold2),var(--gold));color:#000}
 .who{background:rgba(255,255,255,.1);padding:6px 12px;border-radius:20px;font-size:13px}
 main{padding:14px 12px;max-width:1300px;margin:0 auto}
+main>section{display:none!important}main>section.pgon{display:block!important}
+.stat{cursor:pointer}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px}
 .stat{background:rgba(255,255,255,.07);border:1px solid rgba(205,150,15,.45);border-radius:12px;padding:12px 14px;cursor:pointer;transition:.15s}
 .stat:hover,.stat.on{background:rgba(205,150,15,.25);border-color:var(--gold2)}
@@ -355,7 +357,7 @@ tr.tot td{background:linear-gradient(180deg,#f3d98d,#cfa443)!important;color:#1b
  <aside id="side">
   <div class="sbtop"><div class="sblogo"><img data-src="logo" alt="Classic Pack"></div><div class="sbttl"><b>CP REQUISITION</b><small>PORTAL</small></div></div>
   <div class="sbscroll"><div id="nav"></div></div>
-  <div class="sbbot"><button class="nv out" onclick="logout()"><i>&#128682;</i><span>Logout</span></button></div>
+  <div class="sbbot"><div class="who" id="who" style="margin:0 4px 8px;text-align:center;font-size:12px;border-radius:12px;word-break:break-word"></div><button class="nv out" onclick="logout()"><i>&#128682;</i><span>Logout</span></button></div>
  </aside>
  <div id="content">
   <header class="topbar">
@@ -363,24 +365,23 @@ tr.tot td{background:linear-gradient(180deg,#f3d98d,#cfa443)!important;color:#1b
    <h2>CP REQUISITION PORTAL</h2>
    <div class="sp"></div>
    <div class="hrt" id="hrt" style="display:none"><button data-m="raise" onclick="setHrMode('raise')">Raise</button><button data-m="confirm" onclick="setHrMode('confirm')">Confirm</button></div>
-   <div class="who" id="who"></div>
   </header>
   <main>
    <section id="lobbySec" style="display:none">
     <h3 class="sh"><span id="lobbyTitle">Approval Lobby</span><em class="badge" id="lobbycnt">0</em><span class="sp"></span><button class="btn ok sm" id="confallbtn" style="display:none" onclick="confirmAll()">&#10004; Confirm All</button></h3>
+    <div class="bar fb"><input class="fq" placeholder="Search req no, material, vendor..." oninput="setQ(this.value)"><select class="fm" onchange="setFM(this.value)"></select><select class="fd" onchange="setFD(this.value)"></select><button class="btn sm dark" onclick="clearF()">Clear</button></div>
     <div class="tw"><table><thead><tr><th></th><th>Req No</th><th>Date</th><th>Unit</th><th>Dept</th><th>Material / Product</th><th>Vendor</th><th>Amount</th><th>Type</th><th>Status</th><th>Actions</th></tr></thead><tbody id="lobbytb"></tbody></table></div>
    </section>
    <section id="dashSec">
     <div class="sech" onclick="toggleSec('stats')"><span id="ar_stats"></span> Dashboard - Summary</div>
     <div class="stats" id="stats"></div>
+    <div class="bar fb" id="dashfb" style="display:none"><input class="fq" placeholder="Search req no, material, vendor..." oninput="setQ(this.value)"><select class="fm" onchange="setFM(this.value)"></select><select class="fd" onchange="setFD(this.value)"></select><button class="btn sm dark" onclick="clearF()">Clear</button></div><div id="dashlist" style="display:none"></div>
     <div class="dash" id="dash" style="display:none"></div>
    </section>
    <section id="listSec">
     <h3 class="sh" id="listTitle">All Requisitions</h3>
-    <div class="bar">
-     <input id="q" placeholder="Search material, vendor, req no..." oninput="q=this.value;render()">
-     <select id="fdept" onchange="fdept=this.value;render()"></select>
-    </div>
+    <div class="bar fb"><input class="fq" placeholder="Search req no, material, vendor..." oninput="setQ(this.value)"><select class="fm" onchange="setFM(this.value)"></select><select class="fd" onchange="setFD(this.value)"></select><select id="fdept" onchange="fdept=this.value;render()"></select><button class="btn sm dark" onclick="clearF()">Clear</button></div>
+
     <div class="tw"><table><thead><tr><th></th><th>Req No</th><th>Date</th><th>Unit</th><th>Dept</th><th>Material / Product</th><th>Vendor</th><th>Amount</th><th>Type</th><th>Status</th><th>Actions</th></tr></thead><tbody id="tb"></tbody></table></div>
    </section>
   </main>
@@ -2805,7 +2806,7 @@ function stLabel(r){
  if(r.status==='Pending'&&lvl(r)===2){if(mgrDone(r)&&!ceoDone(r))return 'Waiting for CEO';if(ceoDone(r)&&!mgrDone(r))return 'Waiting for Manager';return 'Waiting Mgr + CEO'}
  return r.status;
 }
-let me=null,myName=(function(){try{return localStorage.getItem('cp_req_name')||''}catch(e){return ''}})(),rows=[],settings={},filter='ALL',q='',fdept='ALL',fmonth='ALL';
+let me=null,myName=(function(){try{return localStorage.getItem('cp_req_name')||''}catch(e){return ''}})(),rows=[],settings={},filter='ALL',q='',fdept='ALL',fmonth='ALL',fdate='ALL';
 let collapsed=LS('cp_req_ui',{stats:false,dash:false}),openRows=new Set();
 const saveUI=()=>{try{localStorage.setItem('cp_req_ui',JSON.stringify(collapsed))}catch(e){}};
 const VSEP=';';
@@ -2825,6 +2826,8 @@ let docs=[],pend=[],delDocs=[],exDocs=[];
 const docsOf=id=>docs.filter(d=>d.req_id===id);
 const fmtSize=n=>n>1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round((n||0)/1024))+' KB';
 const mkey=r=>{const d=new Date(r.raised_at||r.created_at);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')};
+const dkey=r=>{const d=new Date(r.raised_at||r.created_at);return mkey(r)+'-'+String(d.getDate()).padStart(2,'0')};
+const dlabel=k=>new Date(+k.slice(0,4),+k.slice(5,7)-1,+k.slice(8)).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
 const mlabel=k=>new Date(+k.slice(0,4),+k.slice(5)-1,1).toLocaleDateString('en-IN',{month:'short',year:'numeric'});
 const sumAmt=a=>a.reduce((s,r)=>s+Number(r.amount||0),0);
 const pwOf=d=>settings['pw_'+d]||DEFAULT_PW[d];
@@ -2852,7 +2855,7 @@ function applyMode(){
 function setHrMode(m){
  if(me!=='HR'||m===hrMode)return;
  hrMode=m;try{localStorage.setItem('cp_req_hrmode',m)}catch(e){}
- filter='ALL';fdept='ALL';q='';const qi=$('#q');if(qi)qi.value='';
+ filter='ALL';fdept='ALL';q='';fmonth='ALL';fdate='ALL';
  applyMode();render();window.scrollTo(0,0);
  toast(m==='raise'?'Raise mode - your own requisitions':'Confirm mode - HR confirmation');
 }
@@ -2873,7 +2876,7 @@ setInterval(async()=>{if(me&&$('#modal').style.display!=='flex'){quiet=true;try{
 function visible(){return rows.filter(r=>seeAll()||r.dept===me)}
 function listShown(){
  const s=q.trim().toLowerCase();
- return visible().filter(r=>(filter==='ALL'||r.status===filter)&&(fdept==='ALL'||r.dept===fdept)&&(fmonth==='ALL'||mkey(r)===fmonth)&&
+ return visible().filter(r=>(filter==='ALL'||r.status===filter)&&(fdept==='ALL'||r.dept===fdept)&&(fmonth==='ALL'||mkey(r)===fmonth)&&(fdate==='ALL'||dkey(r)===fdate)&&
   (!s||[r.req_no,r.material,r.vendor,r.dept,r.unit].join(' ').toLowerCase().includes(s)));
 }
 function canEdit(r){
@@ -2894,21 +2897,42 @@ function rowHtml(r){
   <td class="l" title="${esc(r.material)}">${esc(r.material)}</td><td class="l" title="${esc(vlist(r.vendor).join(', '))}">${esc(vlist(r.vendor).join(', '))}</td><td>${inr(r.amount)}</td><td>${esc(r.invoice_type)}</td>
   <td><span class="pill p-${r.status}">${stLabel(r)}</span></td><td><div class="ic">${a}</div></td></tr>${op?detailRow(r):''}`;
 }
+function fOk(r){const s=q.trim().toLowerCase();return(fmonth==='ALL'||mkey(r)===fmonth)&&(fdate==='ALL'||dkey(r)===fdate)&&(!s||[r.req_no,r.material,r.vendor,r.dept,r.unit].join(' ').toLowerCase().includes(s))}
+function setQ(x){q=x;render()}
+function setFM(x){fmonth=x;if(fdate!=='ALL'&&x!=='ALL'&&fdate.slice(0,7)!==x)fdate='ALL';render()}
+function setFD(x){fdate=x;if(x!=='ALL')fmonth=x.slice(0,7);render()}
+function clearF(){q='';fmonth='ALL';fdate='ALL';render()}
+function syncBars(v){
+ const ms=[...new Set(v.map(mkey))].sort().reverse();
+ const ds=[...new Set(v.filter(r=>fmonth==='ALL'||mkey(r)===fmonth).map(dkey))].sort().reverse();
+ const mh='<option value="ALL">All Months</option>'+ms.map(k=>`<option value="${k}">${mlabel(k)}</option>`).join('');
+ const dh='<option value="ALL">All Dates</option>'+ds.map(k=>`<option value="${k}">${dlabel(k)}</option>`).join('');
+ document.querySelectorAll('.fb').forEach(b=>{
+  const m=b.querySelector('.fm'),d=b.querySelector('.fd'),i=b.querySelector('.fq');
+  m.innerHTML=mh;m.value=fmonth;d.innerHTML=dh;d.value=fdate;
+  if(i.value!==q)i.value=q;
+ });
+}
 function render(){
  const v=visible(),c=st=>v.filter(r=>r.status===st).length,am=st=>sumAmt(v.filter(r=>st==='ALL'||r.status===st));
  const cards=[['ALL','Total',v.length],['Pending','Pending Approval',c('Pending')],['Approved','Approved',c('Approved')],['Confirmed','HR Confirmed',c('Confirmed')],['Rejected','Rejected',c('Rejected')]];
  $('#stats').style.display=collapsed.stats?'none':'';$('#ar_stats').innerHTML=collapsed.stats?'&#9656;':'&#9662;';
- $('#stats').innerHTML=cards.map(x=>`<div class="stat ${filter===x[0]?'on':''}" onclick="filter='${x[0]}';render();goSec('listSec')"><b>${x[2]}</b><span>${x[1]}</span><br><span style="color:var(--gold2);font-weight:700">${inr(am(x[0]))}</span></div>`).join('');
- renderDash(v);
+ $('#stats').innerHTML=cards.map(x=>`<div class="stat ${dashPick===x[0]?'on':''}" onclick="dashPick=(dashPick==='${x[0]}'?null:'${x[0]}');render();if(dashPick)document.getElementById('dashlist').scrollIntoView({behavior:'smooth',block:'start'})"><b>${x[2]}</b><span>${x[1]}</span><br><span style="color:var(--gold2);font-weight:700">${inr(am(x[0]))}</span></div>`).join('');
+ syncBars(v);renderDash(v);
+ const dl=$('#dashlist');$('#dashfb').style.display=dashPick?'':'none';
+ if(dashPick){const pk=cards.find(x=>x[0]===dashPick);const DL=v.filter(r=>(dashPick==='ALL'||r.status===dashPick)&&fOk(r));
+  dl.style.display='';
+  dl.innerHTML=`<h3 class="sh">${pk?pk[1]:''}<em class="badge">${DL.length}</em><span class="sp"></span><button class="btn sm" onclick="dashPick=null;render()">&#10005; Close</button></h3><div class="tw"><table><thead><tr><th></th><th>Req No</th><th>Date</th><th>Unit</th><th>Dept</th><th>Material / Product</th><th>Vendor</th><th>Amount</th><th>Type</th><th>Status</th><th>Actions</th></tr></thead><tbody>${DL.length?DL.map(rowHtml).join(''):'<tr><td colspan="11" class="empty">No requisitions</td></tr>'}</tbody></table></div>`;
+ }else{dl.style.display='none';dl.innerHTML=''}
  const lobbyOn=seeAll();
  $('#lobbySec').style.display=lobbyOn?'':'none';
  if(lobbyOn){
-  const LB=isHRc()?v.filter(r=>r.status==='Approved'):v.filter(r=>canApproveNow(r));
+  const LB0=isHRc()?v.filter(r=>r.status==='Approved'):v.filter(r=>canApproveNow(r));const LB=LB0.filter(fOk);
   $('#lobbyTitle').textContent=isHRc()?'HR Confirmation Lobby':'Approval Lobby';
   $('#lobbycnt').textContent=LB.length;
   $('#lobbytb').innerHTML=LB.length?LB.map(rowHtml).join(''):'<tr><td colspan="11" class="empty">Nothing waiting - all clear</td></tr>';
   $('#confallbtn').style.display=(isHRc()&&LB.length)?'':'none';
-  const nb=$('#nvbadge');if(nb){nb.textContent=LB.length;nb.style.display=LB.length?'':'none'}
+  const nb=$('#nvbadge');if(nb){nb.textContent=LB0.length;nb.style.display=LB0.length?'':'none'}
  }
  const L=listShown();
  const allOpen=L.length&&L.every(r=>openRows.has(r.id))&&!collapsed.stats&&!collapsed.dash;
@@ -2933,11 +2957,12 @@ function buildNav(){
  if(me==='Manager')h+=A('&#9881;&#65039;','Settings',"pwModal();closeNav()",'pwbtn');
  $('#nav').innerHTML=h;
  $('#listTitle').textContent=lobby?'All Requisitions':'My Requisitions';
- setActive(lobby?'lobbySec':'dashSec');
+ showPage(lobby?'lobbySec':'dashSec');setActive(lobby?'lobbySec':'dashSec');
 }
 function setActive(id){document.querySelectorAll('#nav .nv[data-sec]').forEach(b=>b.classList.toggle('on',b.dataset.sec===id))}
-let navLock=0;
-function goSec(id){navLock=Date.now()+900;const el=document.getElementById(id);if(el&&el.offsetParent!==null)el.scrollIntoView({behavior:'smooth',block:'start'});setActive(id);closeNav()}
+let navLock=0,dashPick=null;
+function showPage(id){['lobbySec','dashSec','listSec'].forEach(x=>{const el=document.getElementById(x);if(el)el.classList.toggle('pgon',x===id)})}
+function goSec(id){navLock=Date.now()+900;showPage(id);window.scrollTo(0,0);setActive(id);closeNav()}
 function toggleNav(f){$('#side').classList.toggle('open',f);$('#shade').style.display=$('#side').classList.contains('open')?'block':'none'}
 function closeNav(){toggleNav(false)}
 window.addEventListener('scroll',()=>{if(!me||Date.now()<navLock)return;let cur=null;['lobbySec','dashSec','listSec'].forEach(id=>{const el=document.getElementById(id);if(el&&el.offsetParent!==null&&el.getBoundingClientRect().top<=140)cur=id});if(innerHeight+scrollY>=document.documentElement.scrollHeight-4&&scrollY>0){const vis=['lobbySec','dashSec','listSec'].filter(id=>document.getElementById(id).offsetParent!==null);cur=vis[vis.length-1]}if(cur)setActive(cur)},{passive:true});
@@ -2977,11 +3002,11 @@ function renderDash(v){
  el.innerHTML=`<h3><span class="tg" onclick="toggleSec('dash')">${collapsed.dash?'&#9656;':'&#9662;'} Month-wise Dashboard - Amount Requested</span>
   <button class="btn sm" onclick="exportMonthly()">&#11015; Download</button>
   ${fmonth!=='ALL'?`<button class="btn sm dark" onclick="fmonth='ALL';render()">Showing ${mlabel(fmonth)} - Clear</button>`:''}</h3><div style="display:${collapsed.dash?'none':'block'}">
-  <div class="bars">${M.slice(0,12).reverse().map(x=>`<div class="bar1" onclick="fmonth='${x.k}';render()"><span>${mlabel(x.k)}</span><i style="width:${Math.max(2,x.req/mx*100)}%"></i><span>${inr(x.req)}</span></div>`).join('')||'<div class="empty">No data yet</div>'}</div>
+  <div class="bars">${M.slice(0,12).reverse().map(x=>`<div class="bar1" onclick="fmonth='${x.k}';render();goSec('listSec')"><span>${mlabel(x.k)}</span><i style="width:${Math.max(2,x.req/mx*100)}%"></i><span>${inr(x.req)}</span></div>`).join('')||'<div class="empty">No data yet</div>'}</div>
   <div class="tw"><table><thead><tr><th>Month</th><th>Requests</th><th>Amount Requested</th><th>Approved / Confirmed</th><th>Pending</th><th>Rejected</th><th>Invoiceable</th><th>Non-invoiceable</th></tr></thead><tbody>
-  ${M.map(x=>`<tr class="mrow ${fmonth===x.k?'msel':''}" onclick="fmonth='${x.k}';render()"><td>${mlabel(x.k)}</td><td>${x.n}</td><td><b>${inr(x.req)}</b></td><td>${inr(x.appr)}</td><td>${inr(x.pend)}</td><td>${inr(x.rej)}</td><td>${inr(x.inv)}</td><td>${inr(x.non)}</td></tr>`).join('')}
+  ${M.map(x=>`<tr class="mrow ${fmonth===x.k?'msel':''}" onclick="fmonth='${x.k}';render();goSec('listSec')"><td>${mlabel(x.k)}</td><td>${x.n}</td><td><b>${inr(x.req)}</b></td><td>${inr(x.appr)}</td><td>${inr(x.pend)}</td><td>${inr(x.rej)}</td><td>${inr(x.inv)}</td><td>${inr(x.non)}</td></tr>`).join('')}
   ${M.length?`<tr class="tot"><td>TOTAL</td><td>${T.n}</td><td>${inr(T.req)}</td><td>${inr(T.appr)}</td><td>${inr(T.pend)}</td><td>${inr(T.rej)}</td><td>${inr(T.inv)}</td><td>${inr(T.non)}</td></tr>`:''}
-  </tbody></table></div><div style="font-size:11px;opacity:.7;margin-top:6px">Tap a month to filter the list below.</div></div>`;
+  </tbody></table></div><div style="font-size:11px;opacity:.7;margin-top:6px">Tap a month to see its requisitions.</div></div>`;
 }
 async function exportMonthly(){
  const M=monthData(visible());if(!M.length){toast('Nothing to download');return}
