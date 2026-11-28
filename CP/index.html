@@ -1195,7 +1195,7 @@ function renderChecklistMonth(){
   if(!wrap || !headRow) return;
   const type = activeChecklistType;
   document.getElementById('checklist-table').classList.remove('fyg');const lg0=document.getElementById('fy-legend');if(lg0)lg0.style.display='none';
-  const t0=document.getElementById('checklist-title');if(t0){const mk=dashboardMonthFilter;t0.innerHTML='Compliance Checklist \u2014 '+FY_MN[+mk.slice(5)-1]+' '+mk.slice(0,4)+' &nbsp;<a href="#" style="font-weight:400;font-size:11px" onclick="setDashboardMonthFilter(\'\');return false">\u2190 Back to Financial Year view</a>'}
+  const t0=document.getElementById('checklist-title');if(t0){const mk=dashboardMonthFilter;t0.innerHTML='Compliance Checklist \u2014 '+FY_MN[+mk.slice(5)-1]+' '+mk.slice(0,4)+' &nbsp;<a href="#" style="font-weight:400;font-size:11px;color:var(--ink);text-decoration:underline" onclick="setDashboardMonthFilter(\'\');return false">\u2190 Back to Financial Year view</a>'}
   const cols = stageColumns(type);
   headRow.innerHTML = '<th>Contractor</th>' + cols.map(c => `<th>${escapeHtml(c)}</th>`).join('');
 
