@@ -85,7 +85,7 @@ input:focus, select:focus, textarea:focus{outline:2px solid var(--brass);outline
 /* ---------- APP SHELL ---------- */
 #app{display:none;min-height:100vh;}
 .shell{display:flex;min-height:100vh;}
-.sidebar{width:132px;flex-shrink:0;background:var(--ink);color:var(--paper-2);padding:18px 9px;display:flex;flex-direction:column;}
+.sidebar{position:sticky;top:0;height:100vh;overflow-y:auto;align-self:flex-start;width:132px;flex-shrink:0;background:var(--ink);color:var(--paper-2);padding:18px 9px;display:flex;flex-direction:column;}
 .brand{font-family:'Fraunces',serif;font-weight:600;font-size:15px;margin-bottom:2px;}
 .sidebar-logo{margin-bottom:12px;background:var(--paper-2);padding:9px 10px;border-radius:2px;display:inline-block;}
 .sidebar-logo img{width:76px;height:auto;display:block;}
@@ -233,10 +233,9 @@ td.dl-cell{text-align:center;}
 
 @media (max-width: 760px){
   .shell{flex-direction:column;}
-  .sidebar{width:100%;flex-direction:row;align-items:center;padding:14px 16px;flex-wrap:wrap;}
+  .sidebar{position:static;height:auto;width:100%;flex-direction:row;align-items:center;padding:14px 16px;flex-wrap:wrap;}
   .brand-sub{display:none;}
   .nav-spacer{display:none;}
-  .role-chip{display:none;}
   .nav-group-label{display:none;}
   .nav-divider{display:none;}
   .main{padding:20px;}
@@ -252,6 +251,16 @@ html.in-nexus .top,html.in-nexus header,html.in-nexus .topbar{padding-right:56px
 .bk-row{display:flex;gap:18px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px;}.bk-row select{min-width:240px;}
 .bk-bar{height:8px;background:#e5e0d4;border-radius:4px;overflow:hidden;margin:14px 0 8px}.bk-bar>div{height:100%;width:0;background:var(--brass);transition:width .2s}
 /* single sign-out: only the Gateway of CP logs out */.logout-link{display:none!important}
+
+/* FY status grid */
+.fyg td,.fyg th{padding:9px 4px}.fyg td:first-child,.fyg th:first-child{text-align:left;padding-left:12px;font-weight:600;min-width:150px}
+.fyg thead th.mh{cursor:pointer}.fyg thead th.mh:hover{background:rgba(169,130,44,.12)}.fyg .curm{background:#fffbe6}
+.fyc{display:inline-block;width:28px;height:24px;line-height:24px;border-radius:4px;font-weight:700;font-size:13px;font-family:'Inter',sans-serif}
+button.fyc{border:0;cursor:pointer;padding:0}button.fyc:hover{outline:2px solid var(--ink)}
+.fyc.ok{background:#e3f3ea;color:#1f7a4d}.fyc.mid{background:#fdf0d8;color:#b7791f}.fyc.no{background:#fbe4e1;color:#b42318}.fyc.fut{color:#aaa;width:auto}
+.fylg{display:flex;gap:18px;flex-wrap:wrap;font-size:11.5px;margin:10px 0 0;color:#444}.fylg span{display:inline-flex;align-items:center;gap:6px}.fylg .fyc{width:20px;height:18px;line-height:18px;font-size:11px}
+#fy-pop{position:fixed;z-index:9999;background:#fff;border:1px solid var(--ink);box-shadow:0 10px 30px rgba(0,0,0,.25);padding:14px 16px;width:290px;font-size:13px;display:none}
+#fy-pop .r{display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid #eee}
 </style>
 <script>try{if(window.parent!==window)document.documentElement.classList.add('in-nexus')}catch(e){document.documentElement.classList.add('in-nexus')}</script>
 </head>
@@ -322,7 +331,7 @@ html.in-nexus .top,html.in-nexus header,html.in-nexus .topbar{padding-right:56px
       <div class="nav-item" data-page="backup" onclick="showPage('backup');renderBackupPage()">💾 Backup &amp; Clear</div>
 
       <div class="nav-spacer"></div>
-      <div class="role-chip">Signed in as<br><b id="role-label-sidebar">HR Team</b><br><span class="logout-link" onclick="logout()">Sign out</span></div>
+      <div class="role-chip" id="cp-login-chip"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#3ddc84;margin-right:5px;vertical-align:middle"></span><span style="color:#3ddc84;font-weight:600;font-size:10px">Logged in</span><br><b id="cp-login-name" style="font-size:11px;word-break:break-word"></b><br><span id="role-label-sidebar">HR Team</span><span class="logout-link" onclick="logout()">Sign out</span></div>
     </div>
 
     <div class="main">
@@ -343,7 +352,7 @@ html.in-nexus .top,html.in-nexus header,html.in-nexus .topbar{padding-right:56px
           </div>
         </div>
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
-          <h3 class="serif" style="font-size:15px;margin:0;">Compliance Checklist — by Contractor</h3>
+          <h3 class="serif" style="font-size:15px;margin:0;" id="checklist-title">Compliance Checklist — by Contractor</h3>
           <div id="checklist-tabs" style="display:flex; gap:6px;">
             <button class="btn btn-sm" data-type="labour" onclick="setChecklistType('labour')">Labour</button>
             <button class="btn btn-sm btn-ghost" data-type="pf" onclick="setChecklistType('pf')">PF</button>
@@ -351,7 +360,7 @@ html.in-nexus .top,html.in-nexus header,html.in-nexus .topbar{padding-right:56px
             <button class="btn btn-sm btn-ghost" data-type="cgst" onclick="setChecklistType('cgst')">CGST/SGST</button>
           </div>
         </div>
-        <table class="ledger">
+        <table class="ledger" id="checklist-table">
           <thead><tr id="checklist-head-row"><th>Contractor</th><th>Challan Sent</th><th>Invoice Received</th></tr></thead>
           <tbody id="checklist-body"><tr class="empty-row"><td colspan="3">Loading…</td></tr></tbody>
         </table>
@@ -809,7 +818,8 @@ async function attemptLogin(){
 function enterApp(){
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
-  document.getElementById('role-label-sidebar').textContent = currentRole === 'hr' ? 'HR Team' : 'Management';
+  document.getElementById('role-label-sidebar').textContent = (NEXUS_USER && NEXUS_USER.role_name) || (currentRole === 'hr' ? 'HR Team' : 'Management');
+  try{ document.getElementById('cp-login-name').textContent = (NEXUS_USER && (NEXUS_USER.name || NEXUS_USER.full_name || NEXUS_USER.username)) || (currentUser && currentUser.email) || ''; }catch(e){}
   const hrOnly = currentRole === 'hr';
   document.getElementById('add-labour-btn').style.display = hrOnly ? 'inline-block' : 'none';
   document.getElementById('add-pf-btn').style.display = hrOnly ? 'inline-block' : 'none';
@@ -1063,10 +1073,11 @@ function populateMonthDropdown(){
   ['labour','pf','esi','cgst'].forEach(type => {
     recordIndexes[type].forEach(r => { if(r.month) keys.add(r.month.slice(0,7)); });
   });
+  fyMonths().forEach(k=>{if(k<=new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'))keys.add(k)});
   const sorted = Array.from(keys).sort().reverse();
   const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const keepVal = select.value;
-  select.innerHTML = '<option value="">All months</option>' +
+  select.innerHTML = '<option value="">FY '+fyStart()+'-'+String(fyStart()+1).slice(2)+' (All months)</option>' +
     sorted.map(k => {
       const [y, m] = k.split('-');
       const label = monthNames[Number(m) - 1] + ' ' + y;
@@ -1123,11 +1134,68 @@ function stageStatuses(type, rec){
 
 /* Builds the contractor-wise checklist for whichever type's tab is active, narrowed to the selected month,
    showing every stage of that type's workflow as its own column (Challan Sent / ECR / Paid Challan, etc.) */
-function renderChecklist(){
+function fyStart(){const d=new Date();return d.getMonth()>=3?d.getFullYear():d.getFullYear()-1}
+function fyMonths(){const y=fyStart(),o=[];for(let i=0;i<12;i++){const m=(3+i)%12,yy=m>=3?y:y+1;o.push(yy+'-'+String(m+1).padStart(2,'0'))}return o}
+const FY_MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+/* state of one contractor/month for a type: {k:'ok'|'mid'|'no', done:[bool per stage], pend:[text]} */
+function fyCell(type,cid,mk){
+  const cols=stageColumns(type),cfg=COMPLIANCE_TYPES[type];
+  const recs=recordIndexes[type].filter(r=>String(r.contractor_id)===String(cid)&&(r.month||'').slice(0,7)===mk);
+  if(!recs.length)return{k:'no',cols,done:cols.map(()=>false),next:cols[0]};
+  const st=stageStatuses(type,recs[0]);
+  const done=st.map(x=>x==='Completed');
+  if(done.every(Boolean))return{k:'ok',cols,done};
+  return{k:'mid',cols,done,next:cols[done.indexOf(false)]};
+}
+function renderFY(){
+  const head=document.getElementById('checklist-head-row'),wrap=document.getElementById('checklist-body');
+  const type=activeChecklistType,ms=fyMonths(),now=new Date(),nk=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  const fyl=fyStart()+'-'+String(fyStart()+1).slice(2);
+  const t=document.getElementById('checklist-title');if(t)t.innerHTML='Compliance Status — Financial Year '+fyl+' <span style="font-weight:400;font-size:11px;color:#777">(click a month to open it)</span>';
+  document.getElementById('checklist-table').classList.add('fyg');
+  head.innerHTML='<th>Contractor</th>'+ms.map(k=>`<th class="mh ${k===nk?'curm':''}" onclick="setDashboardMonthFilter('${k}')" title="Open ${FY_MN[+k.slice(5)-1]} ${k.slice(0,4)}">${FY_MN[+k.slice(5)-1].toUpperCase()}<br><span style="font-weight:400">${k.slice(0,4)}</span></th>`).join('');
+  if(!contractors.length){wrap.innerHTML='<tr class="empty-row"><td colspan="13">No contractors added yet.</td></tr>';return}
+  const list=contractors.slice().sort((a,b)=>a.name.localeCompare(b.name));
+  wrap.innerHTML=list.map(c=>`<tr><td>${escapeHtml(c.name)}</td>`+ms.map(k=>{
+    if(k>nk)return`<td class="${k===nk?'curm':''}"><span class="fyc fut">–</span></td>`;
+    const x=fyCell(type,c.id,k),sym={ok:'✓',mid:'◐',no:'✗'}[x.k];
+    return`<td class="${k===nk?'curm':''}"><button class="fyc ${x.k}" onclick="fyPop(event,'${c.id}','${k}')" title="${x.k==='ok'?'Completed':x.k==='mid'?'In progress':'Not uploaded'}">${sym}</button></td>`}).join('')+'</tr>').join('');
+  let lg=document.getElementById('fy-legend');
+  if(!lg){lg=document.createElement('div');lg.id='fy-legend';lg.className='fylg';document.getElementById('checklist-table').insertAdjacentElement('afterend',lg)}
+  const cols=stageColumns(type);
+  const midTxt=cols.length===1?'':(cols.length===3?cols[0]+' · next: '+cols[1]:cols[0]+' · '+cols[1]+' pending');
+  lg.style.display='';
+  lg.innerHTML='<span><b class="fyc ok">✓</b> Completed</span>'+(midTxt?`<span><b class="fyc mid">◐</b> ${escapeHtml(midTxt)}</span>`:'')+`<span><b class="fyc no">✗</b> ${escapeHtml(cols[0])} not uploaded</span><span><b class="fyc fut">–</b> Month not started</span>`;
+}
+function fyPop(ev,cid,mk){
+  ev.stopPropagation();
+  const type=activeChecklistType,cfg=COMPLIANCE_TYPES[type],c=contractors.find(x=>String(x.id)===String(cid));if(!c)return;
+  const x=fyCell(type,cid,mk);
+  const lab=FY_MN[+mk.slice(5)-1]+' '+mk.slice(0,4);
+  const stTxt={ok:'<b style="color:#1f7a4d">Completed</b>',mid:'<b style="color:#b7791f">In progress</b>',no:'<b style="color:#b42318">Not uploaded</b>'}[x.k];
+  const rows=x.cols.map((n,i)=>`<div class="r"><span>${escapeHtml(n)}</span>${x.done[i]?'<b style="color:#1f7a4d">✓ Completed</b>':'<b style="color:#b42318">✗ '+(x.k==='no'?'Not uploaded':'Pending')+'</b>'}</div>`).join('');
+  const pend=x.cols.filter((n,i)=>!x.done[i]);
+  const box=x.k==='ok'?'':`<div style="background:${x.k==='mid'?'#fdf0d8':'#fbe4e1'};padding:8px;margin:8px 0;font-size:12px"><b>Pending:</b> ${escapeHtml(pend.join(', '))}</div>`;
+  const btn=x.k==='ok'?'':`<button class="btn btn-sm" style="width:100%" onclick="fyGo('${type}')">Go to ${escapeHtml(cfg.label)} → Upload ${escapeHtml(x.next)}</button>`;
+  const pop=document.getElementById('fy-pop');
+  pop.innerHTML=`<div style="display:flex;justify-content:space-between"><b class="serif" style="font-size:15px">${escapeHtml(c.name)}</b><span style="cursor:pointer;color:#888" onclick="fyClose()">✕</span></div><div style="color:#666;font-size:12px;margin:2px 0 8px">${lab} · ${escapeHtml(cfg.label)} · ${stTxt}</div>${rows}${box}${btn}`;
+  pop.style.display='block';
+  const r=ev.currentTarget.getBoundingClientRect();
+  let l=Math.min(r.left,innerWidth-pop.offsetWidth-12),tp=r.bottom+6;if(tp+pop.offsetHeight>innerHeight-8)tp=Math.max(8,r.top-pop.offsetHeight-6);
+  pop.style.left=Math.max(8,l)+'px';pop.style.top=tp+'px';
+}
+function fyClose(){const p=document.getElementById('fy-pop');if(p)p.style.display='none'}
+function fyGo(type){fyClose();showBillsPage(type)}
+document.addEventListener('click',e=>{const p=document.getElementById('fy-pop');if(p&&p.style.display==='block'&&!p.contains(e.target))fyClose()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')fyClose()});
+
+function renderChecklistMonth(){
   const wrap = document.getElementById('checklist-body');
   const headRow = document.getElementById('checklist-head-row');
   if(!wrap || !headRow) return;
   const type = activeChecklistType;
+  document.getElementById('checklist-table').classList.remove('fyg');const lg0=document.getElementById('fy-legend');if(lg0)lg0.style.display='none';
+  const t0=document.getElementById('checklist-title');if(t0){const mk=dashboardMonthFilter;t0.innerHTML='Compliance Checklist \u2014 '+FY_MN[+mk.slice(5)-1]+' '+mk.slice(0,4)+' &nbsp;<a href="#" style="font-weight:400;font-size:11px" onclick="setDashboardMonthFilter(\'\');return false">\u2190 Back to Financial Year view</a>'}
   const cols = stageColumns(type);
   headRow.innerHTML = '<th>Contractor</th>' + cols.map(c => `<th>${escapeHtml(c)}</th>`).join('');
 
@@ -1156,6 +1224,7 @@ function renderChecklist(){
   wrap.innerHTML = rows.map(r => r.html).join('');
 }
 
+function renderChecklist(){ if(dashboardMonthFilter)renderChecklistMonth(); else renderFY(); }
 function renderDashboard(){
   populateMonthDropdown();
 
@@ -2184,5 +2253,6 @@ function send(){if(sent)return;sent=true;try{window.parent.postMessage({type:'ne
 window.__nxShown=send;
 var iv=setInterval(function(){var ok=false;try{ok=(document.getElementById('login-screen').style.display==='none'&&document.getElementById('app').style.display==='block')||((function(){var n=document.getElementById('nx-msg');return !!(n&&n.textContent&&n.textContent.indexOf('Connecting')<0)})())}catch(e){} if(ok||Date.now()-t0>12000){clearInterval(iv);send()}},120);})();
 </script>
+<div id="fy-pop"></div>
 </body>
 </html>
