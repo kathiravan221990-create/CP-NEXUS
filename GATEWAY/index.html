@@ -560,6 +560,7 @@ function render(){
     $("bUsers").style.display=""; $("btnIpSec").style.display=""; $("bPw").style.display="none";
     $("lead").textContent="Administrator view: only People and IP SECURITY are available until the passwords are in step.";
     var bn=document.createElement("div"); bn.id="oosBanner"; bn.style.cssText="background:#7a1020;border:1px solid #ff6b6b;color:#fff;border-radius:12px;padding:16px 18px;margin:0 0 14px;line-height:1.5;font-size:15px";
+    if(me.exp){ bn.innerHTML="<b>Session expired.</b> "+(me.oos==="CP WORKSPACE"?"CP WORKSPACE":"CP NEXUS")+" has ended its sign-in, so the tiles are switched off. Press Log Out and log in again to continue. Until then you can only see People and IP SECURITY."; wrap.appendChild(bn); return; }
     bn.innerHTML="<b>Out of step.</b> "+(me.oos==="CP WORKSPACE"?"CP WORKSPACE":"CP NEXUS")+" did not accept your password, so the tiles are switched off. Another Administrator must reset your password (People \u2192 Reset password) so it is the same in both systems. Until then you can only see People and IP SECURITY, and changes cannot be saved.";
     wrap.appendChild(bn); return;
   }
@@ -731,6 +732,23 @@ function wsShared(login){
     return o;
   }catch(e){return null;}
 }
+function jwtExp(t){ try{ var b=String(t).split(".")[1].replace(/-/g,"+").replace(/_/g,"/"); return JSON.parse(atob(b)).exp||0; }catch(e){ return 0; } }
+/* keep the CP WORKSPACE sign-in fresh while the Gateway is open: renew it quietly before the hour is up */
+async function gwKeep(){
+  try{
+    if(!me||!me.ws||!me.ws.tok) return;
+    var sh=wsShared(me.login), exp=(sh&&sh.expires_at)||jwtExp(sh?sh.access_token:me.ws.tok), rt=sh?sh.refresh_token:me.ws.rtok;
+    if(!rt) return;
+    if(exp && exp-Math.floor(Date.now()/1000)>15*60) return;
+    var a=await jf(WS_URL+"/auth/v1/token?grant_type=refresh_token",{method:"POST",headers:{apikey:WS_KEY,"Content-Type":"application/json"},body:JSON.stringify({refresh_token:rt})});
+    if(!a.ok||!a.json||!a.json.access_token) return;
+    me.ws.tok=a.json.access_token; me.ws.rtok=a.json.refresh_token||rt; wsSharedWrite(a.json); gwSave();
+  }catch(e){}
+}
+setInterval(gwKeep,5*60*1000);
+document.addEventListener("visibilitychange",function(){ if(!document.hidden) gwKeep(); });
+/* a clear message on the login page when a saved login has expired (instead of a silent logout) */
+function gwExpNote(){ try{ var e=$("err"); if(e){ e.textContent="Your session expired. Please log in again."; show(e,true); } }catch(x){} }
 function wsSharedWrite(j){ try{ if(j&&j.access_token&&j.refresh_token) localStorage.setItem(WS_SHARED_KEY,JSON.stringify(j)); }catch(e){} }
 function gwRestore(){
   var raw=null; try{raw=JSON.parse(localStorage.getItem(GW_KEY)||"null");}catch(e){}
@@ -756,10 +774,10 @@ function gwRestore(){
   }
   Promise.all([wsP,nxP]).then(function(r){
     /* if a saved side has expired (the app it opened may have used up its one-time refresh), do not show it as Not available: ask for a fresh sign-in */
-    if((raw.ws&&!r[0])||(raw.nx&&!r[1])||(!r[0]&&!r[1])){gwClear();return;}
+    if((raw.ws&&!r[0])||(raw.nx&&!r[1])||(!r[0]&&!r[1])){gwClear();gwExpNote();return;}
     var oosR=null;
-    if(!(r[0]&&r[1])){ if(!sideIsAdmin(r[0],r[1])){gwClear();return;} oosR=r[0]?"CP NEXUS":"CP WORKSPACE"; }
-    me={login:raw.login,ws:r[0],nx:r[1],oos:oosR}; gwSave();
+    if(!(r[0]&&r[1])){ if(!sideIsAdmin(r[0],r[1])){gwClear();gwExpNote();return;} oosR=r[0]?"CP NEXUS":"CP WORKSPACE"; }
+    me={login:raw.login,ws:r[0],nx:r[1],oos:oosR,exp:!!oosR}; gwSave();
     show($("login"),false); show($("home"),true); render(); bellStart(); setTimeout(ipCheckPrompt,600);
   });
 }
