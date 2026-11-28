@@ -833,17 +833,29 @@ function gwRestore(){
   var raw=null; try{raw=JSON.parse(localStorage.getItem(GW_KEY)||"null");}catch(e){}
   if(!raw||!raw.login||(!raw.ws&&!raw.nx)){gwClear();return;}
   var wsP=Promise.resolve(null), nxP=Promise.resolve(null);
-  if(raw.ws){ var sh=wsShared(raw.login); if(sh){ raw.ws.tok=sh.access_token; raw.ws.rtok=sh.refresh_token; } }
-  if(raw.ws&&raw.ws.tok){
-    var H2={apikey:WS_KEY,Authorization:"Bearer "+raw.ws.tok,"Content-Type":"application/json","Content-Profile":"core_api","Accept-Profile":"core_api"};
-    wsP=jf(WS_URL+"/rest/v1/rpc/me",{method:"POST",headers:H2,body:"{}"}).then(function(m){
-      if(m.ok&&m.json) return raw.ws;
-      if(!raw.ws.rtok) return null;
-      return jf(WS_URL+"/auth/v1/token?grant_type=refresh_token",{method:"POST",headers:{apikey:WS_KEY,"Content-Type":"application/json"},body:JSON.stringify({refresh_token:raw.ws.rtok})}).then(function(a){
-        if(!a.ok||!a.json||!a.json.access_token) return null;
-        raw.ws.tok=a.json.access_token; raw.ws.rtok=a.json.refresh_token||raw.ws.rtok; wsSharedWrite(a.json); return raw.ws;
-      });
-    }).catch(function(){return null;});
+  if(raw.ws&&(raw.ws.tok||raw.ws.rtok)){
+    /* the CP WORKSPACE renewal key is single-use: other pages may have used ours, so try the newest saved copy first, then our own, then look again */
+    var wsOwn={tok:raw.ws.tok,rtok:raw.ws.rtok}, tried={};
+    var tryWs=function(c){
+      if(!c||(!c.tok&&!c.rtok)) return Promise.resolve(null);
+      var key=(c.tok||"")+"|"+(c.rtok||""); if(tried[key]) return Promise.resolve(null); tried[key]=1;
+      var H2={apikey:WS_KEY,Authorization:"Bearer "+c.tok,"Content-Type":"application/json","Content-Profile":"core_api","Accept-Profile":"core_api"};
+      var chk=c.tok?jf(WS_URL+"/rest/v1/rpc/me",{method:"POST",headers:H2,body:"{}"}).catch(function(){return {ok:false}}):Promise.resolve({ok:false});
+      return chk.then(function(m){
+        if(m.ok&&m.json) return c;
+        if(!c.rtok) return null;
+        return jf(WS_URL+"/auth/v1/token?grant_type=refresh_token",{method:"POST",headers:{apikey:WS_KEY,"Content-Type":"application/json"},body:JSON.stringify({refresh_token:c.rtok})}).then(function(a){
+          if(!a.ok||!a.json||!a.json.access_token) return null;
+          wsSharedWrite(a.json); return {tok:a.json.access_token,rtok:a.json.refresh_token||c.rtok};
+        }).catch(function(){return null;});
+      }).catch(function(){return null;});
+    };
+    var newest=function(){ var sh=wsShared(raw.login); return sh?{tok:sh.access_token,rtok:sh.refresh_token}:null; };
+    wsP=tryWs(newest()).then(function(r){ return r||tryWs(wsOwn); })
+      .then(function(r){ return r||tryWs(newest()); })
+      .then(function(r){ if(r) return r; return new Promise(function(res){setTimeout(res,900);}).then(function(){ return tryWs(newest()); }); })
+      .then(function(r){ if(!r) return null; raw.ws.tok=r.tok; raw.ws.rtok=r.rtok; return raw.ws; })
+      .catch(function(){return null;});
   }
   if(raw.nx&&raw.nx.token){
     nxP=jf(NX_URL+"/rest/v1/rpc/nexus_whoami",{method:"POST",headers:{apikey:NX_KEY,Authorization:"Bearer "+NX_KEY,"Content-Type":"application/json","x-nexus-token":raw.nx.token},body:"{}"}).then(function(w){
